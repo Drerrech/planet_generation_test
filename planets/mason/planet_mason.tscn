@@ -1,0 +1,14 @@
+[gd_scene format=3 uid="uid://qm2eeshbtjwb"]
+
+[ext_resource type="Script" uid="uid://48evwneuvbsa" path="res://planets/mason/planet_mason.gd" id="1_r118u"]
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_r118u"]
+noise_type = 2
+frequency = 0.15
+fractal_type = 0
+
+[node name="planet_mason" type="Node3D" unique_id=673781389]
+script = ExtResource("1_r118u")
+noise_generator = SubResource("FastNoiseLite_r118u")
+
+[node name="chunks" type="Node" parent="." unique_id=1791254985]

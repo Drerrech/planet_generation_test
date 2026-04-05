@@ -30,7 +30,7 @@ Chunk* make_chunk(int chunk_id, float x, float y, float z) {
     c->y = y;
     c->z = z;
 
-    c->arr = malloc(CHUNK_SIDE_LEN * CHUNK_SIDE_LEN * CHUNK_SIDE_LEN * sizeof(float));
+    c->arr = malloc(CHUNK_SIDE_SIZE * CHUNK_SIDE_SIZE * CHUNK_SIDE_SIZE * sizeof(float));
     fill_chunk_array(c->arr, x, y, z);
     c->v_a = march_and_build_mesh(c->arr);
 

@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://bxj6h83o2pwta"]
+
+[ext_resource type="Script" uid="uid://dr8g043n0gj1a" path="res://chunks/default_chunk/default_chunk.gd" id="1_f00ho"]
+
+[node name="default_chunk" type="Node3D" unique_id=781466555]
+script = ExtResource("1_f00ho")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=168588245]

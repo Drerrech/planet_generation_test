@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://cjptql413evb1"]
+
+[ext_resource type="Script" uid="uid://doqjjn0khmv2h" path="res://planets/test_planet/test_planet.gd" id="1_lqwdr"]
+[ext_resource type="Script" uid="uid://64vvtqg3we1c" path="res://planets/test_planet/chunks.gd" id="2_vm76h"]
+
+[node name="planet_mason" type="Node3D" unique_id=673781389]
+script = ExtResource("1_lqwdr")
+
+[node name="chunks" type="Node" parent="." unique_id=1791254985]
+script = ExtResource("2_vm76h")

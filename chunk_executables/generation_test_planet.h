@@ -3,10 +3,10 @@
 #define PLANET_LEVEL_R_SQ (PLANET_LEVEL_R*PLANET_LEVEL_R)
 #define ISO_LEVEL 0.0f
 
-#define CHUNK_SIDE_LEN 64
+#define CHUNK_SIDE_SIZE 65 // number of points, so 64 cells
 #define CHUNK_CELL_SIDE_SIZE 1.0f
 
-#define MAX_NUM_VERTICES (15 * (CHUNK_SIDE_LEN - 1) * (CHUNK_SIDE_LEN - 1) * (CHUNK_SIDE_LEN - 1)) // maximum of 15 vertices per cube (with duplicates)
+#define MAX_NUM_VERTICES (15 * (CHUNK_SIDE_SIZE - 1) * (CHUNK_SIDE_SIZE - 1) * (CHUNK_SIDE_SIZE - 1)) // maximum of 15 vertices per cube (with duplicates)
 
 
 typedef struct {

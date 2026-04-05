@@ -14,14 +14,14 @@ float get_global_value(float x, float y, float z) {
 
 // filling in the chunk array and generating mesh
 int get_idx(int x, int y, int z) {
-    return x * CHUNK_SIDE_LEN * CHUNK_SIDE_LEN + y * CHUNK_SIDE_LEN + z;
+    return x * CHUNK_SIDE_SIZE * CHUNK_SIDE_SIZE + y * CHUNK_SIDE_SIZE + z;
 }
 
 void fill_chunk_array(float *arr, float x_global, float y_global, float z_global) {
     int idx = 0;
-    for (int x_idx = 0; x_idx < CHUNK_SIDE_LEN; x_idx++) {
-        for (int y_idx = 0; y_idx < CHUNK_SIDE_LEN; y_idx++) {
-            for (int z_idx = 0; z_idx < CHUNK_SIDE_LEN; z_idx++) {
+    for (int x_idx = 0; x_idx < CHUNK_SIDE_SIZE; x_idx++) {
+        for (int y_idx = 0; y_idx < CHUNK_SIDE_SIZE; y_idx++) {
+            for (int z_idx = 0; z_idx < CHUNK_SIDE_SIZE; z_idx++) {
                 arr[idx] = get_global_value(x_global + x_idx * CHUNK_CELL_SIDE_SIZE, y_global + y_idx * CHUNK_CELL_SIDE_SIZE, z_global + z_idx * CHUNK_CELL_SIDE_SIZE);
                 idx++;
             }
@@ -31,14 +31,14 @@ void fill_chunk_array(float *arr, float x_global, float y_global, float z_global
 
 int get_triangulation_idx(float *arr, int x, int y, int z) {
 	int idx = 0b00000000;
-    idx |= (arr[get_idx(x, y, z)] < ISO_LEVEL) << 0;
-    idx |= (arr[get_idx(x, y, z+1)] < ISO_LEVEL) << 1;
-    idx |= (arr[get_idx(x+1, y, z+1)] < ISO_LEVEL) << 2;
-	idx |= (arr[get_idx(x+1, y, z)] < ISO_LEVEL) << 3;
-	idx |= (arr[get_idx(x, y+1, z)] < ISO_LEVEL) << 4;
-	idx |= (arr[get_idx(x, y+1, z+1)] < ISO_LEVEL) << 5;
-	idx |= (arr[get_idx(x+1, y+1, z+1)] < ISO_LEVEL) << 6;
-	idx |= (arr[get_idx(x+1, y+1, z)] < ISO_LEVEL) << 7;
+    idx |= (arr[get_idx(x, y, z)] > ISO_LEVEL) << 0;
+    idx |= (arr[get_idx(x, y, z+1)] > ISO_LEVEL) << 1;
+    idx |= (arr[get_idx(x+1, y, z+1)] > ISO_LEVEL) << 2;
+	idx |= (arr[get_idx(x+1, y, z)] > ISO_LEVEL) << 3;
+	idx |= (arr[get_idx(x, y+1, z)] > ISO_LEVEL) << 4;
+	idx |= (arr[get_idx(x, y+1, z+1)] > ISO_LEVEL) << 5;
+	idx |= (arr[get_idx(x+1, y+1, z+1)] > ISO_LEVEL) << 6;
+	idx |= (arr[get_idx(x+1, y+1, z)] > ISO_LEVEL) << 7;
 	
 	return idx;
 }
@@ -57,9 +57,9 @@ void delete_vertex_array(VertexArray *v_a) {
 VertexArray march_and_build_mesh(float *arr) {
     VertexArray v_a = make_vertex_array();
     
-    for (int x_idx = 0; x_idx < CHUNK_SIDE_LEN - 1; x_idx++) {
-        for (int y_idx = 0; y_idx < CHUNK_SIDE_LEN - 1; y_idx++) {
-            for (int z_idx = 0; z_idx < CHUNK_SIDE_LEN - 1; z_idx++) {
+    for (int x_idx = 0; x_idx < CHUNK_SIDE_SIZE - 1; x_idx++) {
+        for (int y_idx = 0; y_idx < CHUNK_SIDE_SIZE - 1; y_idx++) {
+            for (int z_idx = 0; z_idx < CHUNK_SIDE_SIZE - 1; z_idx++) {
                 int triangulation_idx = get_triangulation_idx(arr, x_idx, y_idx, z_idx);
 
                 for (int i = 0; i < 16; i++) {
