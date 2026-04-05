@@ -8,7 +8,7 @@
 // -1 - empty
 // +1 - full
 float get_global_value(float x, float y, float z) {
-    return fmax(fmin(PLANET_LEVEL_R_SQ - (x*x + y*y + z*z), 1.0), -1.0);
+    return fmax(fmin(0.005f * (PLANET_LEVEL_R_SQ - (x*x + y*y + z*z)), 1.0f), -1.0f);
 }
 
 
