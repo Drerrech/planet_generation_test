@@ -70,16 +70,30 @@ func request_generate(chunk_id: int, x: float, y: float, z: float) -> PackedVect
 	socket.poll()  # flush send buffer
 
 	# spin until vertex count arrives — on localhost this is microseconds
+	var deadline = Time.get_ticks_msec() + 5000
 	while socket.get_available_bytes() < 4:
 		socket.poll()
+		if socket.get_status() != StreamPeerTCP.STATUS_CONNECTED:
+			print("[chunks] ERROR: socket disconnected waiting for vertex count")
+			return PackedVector3Array()
+		if Time.get_ticks_msec() > deadline:
+			print("[chunks] ERROR: timed out waiting for vertex count")
+			return PackedVector3Array()
 	var vertex_count = socket.get_32()
 	if print_debug:
 		print("[chunks] chunk ", chunk_id, " expecting ", vertex_count, " vertices")
 
 	var total_bytes = vertex_count * VERTEX_SIZE
 	var bytes := PackedByteArray()
+	deadline = Time.get_ticks_msec() + 10000
 	while bytes.size() < total_bytes:
 		socket.poll()
+		if socket.get_status() != StreamPeerTCP.STATUS_CONNECTED:
+			print("[chunks] ERROR: socket disconnected waiting for vertex data")
+			return PackedVector3Array()
+		if Time.get_ticks_msec() > deadline:
+			print("[chunks] ERROR: timed out waiting for vertex data")
+			return PackedVector3Array()
 		var available = socket.get_available_bytes()
 		if available > 0:
 			var to_read = min(available, total_bytes - bytes.size())
@@ -89,6 +103,7 @@ func request_generate(chunk_id: int, x: float, y: float, z: float) -> PackedVect
 					print("[chunks] ERROR: get_data failed: ", result[0])
 				return PackedVector3Array()
 			bytes.append_array(result[1])
+			deadline = Time.get_ticks_msec() + 10000  # reset timeout while data flows
 
 	var verts := PackedVector3Array()
 	verts.resize(vertex_count)
