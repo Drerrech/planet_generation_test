@@ -1,5 +1,5 @@
-#define MAX_NUM_CHUNKS 16*16*16
-#define PLANET_LEVEL_R 128.0f
+#define MAX_NUM_CHUNKS 32*32*32
+#define PLANET_LEVEL_R 240.0f
 #define PLANET_LEVEL_R_SQ (PLANET_LEVEL_R*PLANET_LEVEL_R)
 #define ISO_LEVEL 0.0f
 
@@ -23,6 +23,7 @@ typedef struct {
 VertexArray make_vertex_array();
 void delete_vertex_array(VertexArray *v_a);
 
+void init_noise();
 void fill_chunk_array(float *arr, float x_global, float y_global, float z_global);
 
 VertexArray march_and_build_mesh(float *arr);

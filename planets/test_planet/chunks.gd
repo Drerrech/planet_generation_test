@@ -7,7 +7,7 @@ const print_debug = false
 const chunk_scene := preload("res://chunks/default_chunk/default_chunk.tscn")
 
 # NOTE: MUST BE THE SAME AS EXECUTABLE
-const NUM_CHUNKS_SIDE = Vector3i(16, 16, 16)
+const NUM_CHUNKS_SIDE = Vector3i(32, 32, 32)
 const NUM_CHUNKS = NUM_CHUNKS_SIDE.x * NUM_CHUNKS_SIDE.y * NUM_CHUNKS_SIDE.z
 const CHUNK_SIZE = Vector3(16.0, 16.0, 16.0)
 

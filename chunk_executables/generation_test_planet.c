@@ -1,15 +1,100 @@
 #include "generation_test_planet.h"
 #include "constants.h"
 
+#include "FastNoiseLite.h"
+
 #include <stdlib.h>
 #include <math.h>
 
 // defining planet generation logic
 // -1 - empty
 // +1 - full
+static fnl_state simplex2_noise;  // global to this file
+static fnl_state cellular_eucl_sq_sub_noise;
+static fnl_state cellular_eucl_sq_mul_noise;
+static fnl_state cellular_eucl_sq_div_noise;
+
+void init_noise() {
+    simplex2_noise = fnlCreateState();
+    simplex2_noise.noise_type = FNL_NOISE_OPENSIMPLEX2;
+
+    cellular_eucl_sq_sub_noise = fnlCreateState();
+    cellular_eucl_sq_sub_noise.noise_type = FNL_NOISE_CELLULAR;
+    cellular_eucl_sq_sub_noise.cellular_distance_func = FNL_CELLULAR_DISTANCE_EUCLIDEANSQ;
+    cellular_eucl_sq_sub_noise.cellular_return_type = FNL_CELLULAR_RETURN_TYPE_DISTANCE2SUB;
+    
+    cellular_eucl_sq_mul_noise = fnlCreateState();
+    cellular_eucl_sq_mul_noise.noise_type = FNL_NOISE_CELLULAR;
+    cellular_eucl_sq_mul_noise.cellular_distance_func = FNL_CELLULAR_DISTANCE_EUCLIDEANSQ;
+    cellular_eucl_sq_mul_noise.cellular_return_type = FNL_CELLULAR_RETURN_TYPE_DISTANCE2MUL;
+
+    cellular_eucl_sq_div_noise = fnlCreateState();
+    cellular_eucl_sq_div_noise.noise_type = FNL_NOISE_CELLULAR;
+    cellular_eucl_sq_div_noise.cellular_distance_func = FNL_CELLULAR_DISTANCE_EUCLIDEANSQ;
+    cellular_eucl_sq_div_noise.cellular_return_type = FNL_CELLULAR_RETURN_TYPE_DISTANCE2DIV;
+}
+
+const float SUFACE_LEVEL_MOUNTAIN_HEIGHT = 10.f;
+
 float get_global_value(float x, float y, float z) {
-    return 2*(double)rand() / (double)RAND_MAX - 1; // random
-    // return fmax(fmin(0.005f * (PLANET_LEVEL_R_SQ - (x*x + y*y + z*z)), 1.0f), -1.0f);
+    float point_r_sq = x*x + y*y + z*z;
+    float point_r = sqrtf(point_r_sq);
+
+    float unit_dir_x = 0.5773502692f;
+    float unit_dir_y = 0.5773502692f;
+    float unit_dir_z = 0.5773502692f;
+    if (fabs(x) >= 0.000001 || fabs(y) >= 0.000001 || fabs(z) >= 0.000001) {
+        unit_dir_x = x / point_r;
+        unit_dir_y = y / point_r;
+        unit_dir_z = z / point_r;
+    }
+
+    float final_val = 0.f;
+
+    //mountains
+    if (point_r >= 0.9f * PLANET_LEVEL_R) {
+        // want range [-0.700 -0.500] -> [0, 1]
+        float _l = -0.900f; float _h = -0.700f;
+        float mountain_addition = (-_l + fmin(fmax(fnlGetNoise3D(&cellular_eucl_sq_sub_noise, unit_dir_x * 500.f, unit_dir_y * 500.f, unit_dir_z * 500.f), _l), _h)) / (_h - _l);
+        // float mountain_addition = (fnlGetNoise3D(&cellular_eucl_sq_sub_noise, x, y, z) + 1.f) * 0.5f;
+        float surface_addition = PLANET_LEVEL_R - point_r;
+        float mountain_value = fmax(fmin(0.05f * (surface_addition + SUFACE_LEVEL_MOUNTAIN_HEIGHT * mountain_addition), 1.0f), -1.0f);
+
+        final_val += mountain_value;
+    }
+
+    // cave shafts
+    if (point_r >= 0.85f * PLANET_LEVEL_R) {
+        float _l = -1.000f; float _h = -0.800f;
+        // -> [0, 1] -> [-1, 1]
+        float mask = (-_l + fmin(fmax(fnlGetNoise3D(&simplex2_noise, unit_dir_x * 1000.f, unit_dir_y * 1000.f, unit_dir_z * 1000.f), _l), _h)) / (_h - _l);
+        mask = mask*2.f - 1.f;
+        if (mask < 0) {
+            // float _l = -0.950f; float _h = -0.750f;
+            // float cave_value = (-_l + fmin(fmax(fnlGetNoise3D(&cellular_eucl_sq_mul_noise, x * 5.f, y * 5.f, z * 5.f), _l), _h)) / (_h - _l);
+            // final_val += cave_value; // -mask * 
+            final_val = -1;
+        }
+    }
+
+    // caves
+    if (point_r < 0.9f * PLANET_LEVEL_R) {
+        float mask = fnlGetNoise3D(&simplex2_noise, x * 1.f, y * 1.f, z * 1.f);
+        if (mask < 0) {
+            float _l = -0.950f; float _h = -0.750f;
+            // -> [0, 1] -> [-1, 1]
+            float cave_value = (-_l + fmin(fmax(fnlGetNoise3D(&cellular_eucl_sq_mul_noise, x * 5.f, y * 5.f, z * 5.f), _l), _h)) / (_h - _l);
+            cave_value = cave_value*2.f - 1.f;
+            final_val += cave_value; // -mask * 
+        } else {
+            final_val += mask;
+
+            // final_val += 1;
+        }
+    }
+
+    // final value (scaled)
+    return fmax(fmin(final_val, 1.0f), -1.0f);
 }
 
 

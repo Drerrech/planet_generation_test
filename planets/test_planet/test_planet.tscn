@@ -3,8 +3,19 @@
 [ext_resource type="Script" uid="uid://doqjjn0khmv2h" path="res://planets/test_planet/test_planet.gd" id="1_lqwdr"]
 [ext_resource type="Script" uid="uid://64vvtqg3we1c" path="res://planets/test_planet/chunks.gd" id="2_vm76h"]
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_vm76h"]
+albedo_color = Color(1, 0, 1, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_7gi6k"]
+material = SubResource("StandardMaterial3D_vm76h")
+size = Vector3(1, 2, 1)
+
 [node name="planet_mason" type="Node3D" unique_id=673781389]
 script = ExtResource("1_lqwdr")
 
 [node name="chunks" type="Node" parent="." unique_id=1791254985]
 script = ExtResource("2_vm76h")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1497723804]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.8684616, 250.76147, -8.631255)
+mesh = SubResource("BoxMesh_7gi6k")

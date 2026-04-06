@@ -14,9 +14,9 @@ func _ready() -> void:
 
 	# generate all chunks, yielding once per frame to keep editor responsive
 	var frame_start = Time.get_ticks_msec()
-	for i in range(chunks.NUM_CHUNKS):
+	for i in range(chunks.NUM_CHUNKS/2):
 		chunks.load_chunk(i)
-		if Time.get_ticks_msec() - frame_start >= 16:
+		if Time.get_ticks_msec() - frame_start >= 128:
 			await get_tree().process_frame
 			frame_start = Time.get_ticks_msec()
 	

@@ -56,6 +56,9 @@ static int send_all(int sock, const void *buf, size_t len) {
 }
 
 int main() {
+    // init planet noise
+    init_noise();
+
     // array of chunks, some will be active and malloced, those that are deleted are freed
     Chunk *chunks[MAX_NUM_CHUNKS] = {NULL}; // define to null in case we call free on it
     
