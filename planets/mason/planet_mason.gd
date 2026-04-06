@@ -10,7 +10,7 @@ extends Node3D
 const chunk_scene := preload("res://terrain/chunk/chunk.tscn")
 const planet_shader = preload("res://terrain/chunk/shaders/planet_triplanar.gdshader")
 
-var num_chunks = Vector3i(8, 8, 8)
+var num_chunks = Vector3i(4, 4, 4)
 var terrain_val_f: Callable = func(point_pos) -> float: # [0, 1]
 	const planet_r = 30
 	const planet_r_2 = planet_r**2
@@ -64,7 +64,7 @@ func create_all_chunks():
 			for z in range(num_chunks[2]):
 				var _instance_name = str(x)+"_"+str(y)+"_"+str(z)
 				
-				var _num_cells = Vector3i(8, 16, 8)
+				var _num_cells = Vector3i(64, 64, 64)
 				var _cell_size = Vector3(1, 1, 1)
 				
 				var _relative_pos = (Vector3(x, y, z) - num_chunks/2.0) * Vector3(_num_cells)*_cell_size

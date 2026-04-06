@@ -1,9 +1,9 @@
-#define MAX_NUM_CHUNKS 4*4*4
+#define MAX_NUM_CHUNKS 16*16*16
 #define PLANET_LEVEL_R 128.0f
 #define PLANET_LEVEL_R_SQ (PLANET_LEVEL_R*PLANET_LEVEL_R)
 #define ISO_LEVEL 0.0f
 
-#define CHUNK_SIDE_SIZE 65 // number of points, so x-1 cells
+#define CHUNK_SIDE_SIZE 17 // number of points, so x-1 cells
 #define CHUNK_CELL_SIDE_SIZE 1.0f
 
 #define MAX_NUM_VERTICES (15 * (CHUNK_SIDE_SIZE - 1) * (CHUNK_SIDE_SIZE - 1) * (CHUNK_SIDE_SIZE - 1)) // maximum of 15 vertices per cube (with duplicates)

@@ -8,6 +8,7 @@
 // -1 - empty
 // +1 - full
 float get_global_value(float x, float y, float z) {
+    // return 2*(double)rand() / (double)RAND_MAX - 1; // random
     return fmax(fmin(0.005f * (PLANET_LEVEL_R_SQ - (x*x + y*y + z*z)), 1.0f), -1.0f);
 }
 
