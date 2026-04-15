@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <math.h>
 
+// GENERATES ROUGH TERRAIN
+
 // defining planet generation logic
 // -1 - empty
 // +1 - full
