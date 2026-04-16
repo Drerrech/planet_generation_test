@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <math.h>
 
-// GENERATES ROUGH TERRAIN
 
 // defining planet generation logic
 // -1 - empty
@@ -24,6 +23,7 @@ void init_noise() {
     cellular_eucl_sq_sub_noise.noise_type = FNL_NOISE_CELLULAR;
     cellular_eucl_sq_sub_noise.cellular_distance_func = FNL_CELLULAR_DISTANCE_EUCLIDEANSQ;
     cellular_eucl_sq_sub_noise.cellular_return_type = FNL_CELLULAR_RETURN_TYPE_DISTANCE2SUB;
+    cellular_eucl_sq_sub_noise.cellular_jitter_mod = 0.0f;
     
     cellular_eucl_sq_mul_noise = fnlCreateState();
     cellular_eucl_sq_mul_noise.noise_type = FNL_NOISE_CELLULAR;
@@ -37,6 +37,14 @@ void init_noise() {
 }
 
 const float SUFACE_LEVEL_MOUNTAIN_HEIGHT = 10.f;
+
+float scale_to_0_1(float l, float h, float val) {
+    return (fmin(fmax(val, l), h) - l) / (h - l);
+}
+
+float scale_to_neg_1_1(float l, float h, float val) {
+    return (fmin(fmax(val, l), h) - l) / (h - l) * 2.f - 1.f;
+}
 
 float get_global_value(float x, float y, float z) {
     float point_r_sq = x*x + y*y + z*z;
@@ -53,50 +61,36 @@ float get_global_value(float x, float y, float z) {
 
     float final_val = 0.f;
 
-    //mountains
-    if (point_r >= 0.9f * PLANET_LEVEL_R) {
-        // want range [-0.700 -0.500] -> [0, 1]
-        float _l = -0.900f; float _h = -0.700f;
-        float mountain_addition = (-_l + fmin(fmax(fnlGetNoise3D(&cellular_eucl_sq_sub_noise, unit_dir_x * 500.f, unit_dir_y * 500.f, unit_dir_z * 500.f), _l), _h)) / (_h - _l);
-        // float mountain_addition = (fnlGetNoise3D(&cellular_eucl_sq_sub_noise, x, y, z) + 1.f) * 0.5f;
-        float surface_addition = PLANET_LEVEL_R - point_r;
-        float mountain_value = fmax(fmin(0.05f * (surface_addition + SUFACE_LEVEL_MOUNTAIN_HEIGHT * mountain_addition), 1.0f), -1.0f);
+    // TODO: inner layers
+    if (point_r < 0.95f * PLANET_LEVEL_R) {
+        final_val = -1.0f;
+    }
+    
+    // surface and mountains
+    else if (point_r < 1.05f * PLANET_LEVEL_R) {
+        // surface
+        float surface_val = (PLANET_LEVEL_R - point_r) / CHUNK_CELL_SIDE_SIZE;
+        surface_val = fmin(fmax(surface_val, -1.0f), 1.0f);
 
-        final_val += mountain_value;
+        // mountains
+        float _l = -1.000; float _h = 0.000f;
+        float mountain_height_addition = SUFACE_LEVEL_MOUNTAIN_HEIGHT * scale_to_0_1(_l, _h, fnlGetNoise3D(&cellular_eucl_sq_sub_noise, 500.0f * unit_dir_x, 500.0f * unit_dir_y, 500.0f * unit_dir_z));
+        float mountain_val = (PLANET_LEVEL_R - point_r + mountain_height_addition) / CHUNK_CELL_SIDE_SIZE;
+
+        mountain_val = fnlGetNoise3D(&simplex2_noise, 500.0f * unit_dir_x, 500.0f * unit_dir_y, 500.0f * unit_dir_z);
+
+        mountain_val = fmin(fmax(mountain_val, -1.0f), 1.0f);
+        
+        // final value
+        float max_val = -1.0f;
+        // max_val = fmax(max_val, surface_val);
+        max_val = fmax(max_val, mountain_val);
+
+        final_val = max_val;
     }
 
-    // cave shafts
-    if (point_r >= 0.85f * PLANET_LEVEL_R) {
-        float _l = -1.000f; float _h = -0.800f;
-        // -> [0, 1] -> [-1, 1]
-        float mask = (-_l + fmin(fmax(fnlGetNoise3D(&simplex2_noise, unit_dir_x * 1000.f, unit_dir_y * 1000.f, unit_dir_z * 1000.f), _l), _h)) / (_h - _l);
-        mask = mask*2.f - 1.f;
-        if (mask < 0) {
-            // float _l = -0.950f; float _h = -0.750f;
-            // float cave_value = (-_l + fmin(fmax(fnlGetNoise3D(&cellular_eucl_sq_mul_noise, x * 5.f, y * 5.f, z * 5.f), _l), _h)) / (_h - _l);
-            // final_val += cave_value; // -mask * 
-            final_val = -1;
-        }
-    }
-
-    // caves
-    if (point_r < 0.9f * PLANET_LEVEL_R) {
-        float mask = fnlGetNoise3D(&simplex2_noise, x * 1.f, y * 1.f, z * 1.f);
-        if (mask < 0) {
-            float _l = -0.950f; float _h = -0.750f;
-            // -> [0, 1] -> [-1, 1]
-            float cave_value = (-_l + fmin(fmax(fnlGetNoise3D(&cellular_eucl_sq_mul_noise, x * 5.f, y * 5.f, z * 5.f), _l), _h)) / (_h - _l);
-            cave_value = cave_value*2.f - 1.f;
-            final_val += cave_value; // -mask * 
-        } else {
-            final_val += mask;
-
-            // final_val += 1;
-        }
-    }
-
-    // final value (scaled)
-    return fmax(fmin(final_val, 1.0f), -1.0f);
+    // final value (with safety crop)
+    return fmin(fmax(final_val, -1.0f), 1.0f);
 }
 
 
