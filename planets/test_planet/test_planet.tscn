@@ -3,19 +3,28 @@
 [ext_resource type="Script" uid="uid://doqjjn0khmv2h" path="res://planets/test_planet/test_planet.gd" id="1_lqwdr"]
 [ext_resource type="Script" uid="uid://64vvtqg3we1c" path="res://planets/test_planet/chunks.gd" id="2_vm76h"]
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_vm76h"]
-albedo_color = Color(1, 0, 1, 1)
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_vm76h"]
+sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+ground_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
 
-[sub_resource type="BoxMesh" id="BoxMesh_7gi6k"]
-material = SubResource("StandardMaterial3D_vm76h")
-size = Vector3(1, 2, 1)
+[sub_resource type="Sky" id="Sky_7gi6k"]
+sky_material = SubResource("ProceduralSkyMaterial_vm76h")
 
-[node name="planet_mason" type="Node3D" unique_id=673781389]
+[sub_resource type="Environment" id="Environment_cpskl"]
+background_mode = 2
+sky = SubResource("Sky_7gi6k")
+tonemap_mode = 2
+glow_enabled = true
+
+[node name="test_planet" type="Node3D" unique_id=673781389]
 script = ExtResource("1_lqwdr")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1811017901]
+environment = SubResource("Environment_cpskl")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=573502740]
+transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.50000006, 0.75, -0.43301266, 0, 0, 0)
+shadow_enabled = true
 
 [node name="chunks" type="Node" parent="." unique_id=1791254985]
 script = ExtResource("2_vm76h")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1497723804]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.8684616, 250.76147, -8.631255)
-mesh = SubResource("BoxMesh_7gi6k")

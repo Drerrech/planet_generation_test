@@ -10,6 +10,8 @@
 #define REQ_GENERATE 1
 #define REQ_DELETE 2
 
+static char user_dir[512];
+
 typedef struct {
     int chunk_id;
     float x;
@@ -30,8 +32,27 @@ Chunk* make_chunk(int chunk_id, float x, float y, float z) {
     c->y = y;
     c->z = z;
 
+
     c->arr = malloc(CHUNK_SIDE_SIZE * CHUNK_SIDE_SIZE * CHUNK_SIDE_SIZE * sizeof(float));
+    // fill with generation
     fill_chunk_array(c->arr, x, y, z);
+
+    // apply player changes
+    char path[256];
+    snprintf(path, sizeof(path), "%splayer_delta/test_planet/%d.bin", user_dir, chunk_id);
+    FILE *f = fopen(path, "rb");
+    if (f != NULL) { // player changed something in this chunk
+        int point_idx;
+        float point_val;
+        while (fread(&point_idx, sizeof(int), 1, f) == 1) {
+            fread(&point_val, sizeof(float), 1, f);
+            // overwrite chunk's array with the change
+            c->arr[point_idx] = point_val;
+        }
+        fclose(f);
+    }
+
+    // build the mesh with (updated) values)
     c->v_a = march_and_build_mesh(c->arr);
 
     return c;
@@ -55,7 +76,11 @@ static int send_all(int sock, const void *buf, size_t len) {
     return 0;
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+    if (argc > 1)
+        snprintf(user_dir, sizeof(user_dir), "%s", argv[1]);
+    else
+        snprintf(user_dir, sizeof(user_dir), "./");
     // init planet noise
     init_noise();
 

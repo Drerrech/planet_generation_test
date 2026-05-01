@@ -1,0 +1,4 @@
+before compiling:
+	disable vsync
+	make sure to remove all non-conditioned print messages
+	

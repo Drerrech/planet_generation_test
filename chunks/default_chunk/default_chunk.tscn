@@ -2,7 +2,18 @@
 
 [ext_resource type="Script" uid="uid://dr8g043n0gj1a" path="res://chunks/default_chunk/default_chunk.gd" id="1_f00ho"]
 
-[node name="default_chunk" type="Node3D" unique_id=781466555]
+[sub_resource type="BoxShape3D" id="BoxShape3D_f00ho"]
+size = Vector3(16, 16, 16)
+
+[node name="default_chunk" type="StaticBody3D" unique_id=1492706686]
 script = ExtResource("1_f00ho")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=168588245]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=238312211]
+
+[node name="Area3D" type="Area3D" parent="." unique_id=1377964231 groups=["chunk"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 8, 8)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Area3D" unique_id=2019567519]
+shape = SubResource("BoxShape3D_f00ho")

@@ -1,0 +1,51 @@
+[gd_scene format=3 uid="uid://bfo37mvk2xobl"]
+
+[ext_resource type="Script" uid="uid://dm42ij4q1xquk" path="res://entities/player/movement.gd" id="1_symyc"]
+[ext_resource type="Script" uid="uid://c6uwkgon46pa" path="res://entities/player/canvas.gd" id="2_abrql"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_sfv1e"]
+size = Vector3(0.6, 2, 0.6)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_symyc"]
+albedo_color = Color(1, 0, 1, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_abrql"]
+material = SubResource("StandardMaterial3D_symyc")
+size = Vector3(0.6, 2, 0.6)
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_symyc"]
+radius = 128.0
+
+[node name="player" type="CharacterBody3D" unique_id=1616774405]
+script = ExtResource("1_symyc")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=728266607]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+shape = SubResource("BoxShape3D_sfv1e")
+
+[node name="torso" type="Node3D" parent="." unique_id=1800629158]
+
+[node name="head" type="Node3D" parent="torso" unique_id=1527348599]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8, 0)
+
+[node name="Camera3D" type="Camera3D" parent="torso/head" unique_id=626330451]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 256)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="torso" unique_id=1833300516]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+mesh = SubResource("BoxMesh_abrql")
+
+[node name="chunk_loading_area3d" type="Area3D" parent="." unique_id=1922640290 groups=["player"]]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="chunk_loading_area3d" unique_id=1631846953]
+shape = SubResource("SphereShape3D_symyc")
+
+[node name="canvas" type="Node2D" parent="." unique_id=619496060]
+script = ExtResource("2_abrql")
+
+[node name="fps_counter" type="Label" parent="canvas" unique_id=1625762232]
+offset_right = 40.0
+offset_bottom = 23.0
+
+[connection signal="area_entered" from="chunk_loading_area3d" to="." method="_on_chunk_loading_area_3d_area_entered"]
+[connection signal="area_exited" from="chunk_loading_area3d" to="." method="_on_chunk_loading_area_3d_area_exited"]

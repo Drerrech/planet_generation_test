@@ -1,4 +1,4 @@
-@tool
+#@tool
 
 extends Node
 
@@ -22,7 +22,15 @@ func init() -> void:
 	if print_debug:
 		print("[chunks] spawning server process...")
 	var exe_path = ProjectSettings.globalize_path("res://chunk_executables/test_server")
-	pid = OS.create_process(exe_path, [])
+	var user_dir = ProjectSettings.globalize_path("user://")
+	pid = OS.create_process(exe_path, [user_dir])
+
+	# TODO REMOVE THIS IS DEBUG
+	#var f = FileAccess.open("user://player_delta/test_planet/0.bin", FileAccess.WRITE)
+	#for i in range(100):
+		#f.store_32(400+i)
+		#f.store_float(1.0)
+	#f.close()
 
 	await get_tree().create_timer(0.2).timeout
 
@@ -57,6 +65,11 @@ func _exit_tree():
 		pid = -1
 	if print_debug:
 		print("[chunks] server killed")
+	
+	# unload all chunks (write delta to memory)
+	for i in range(NUM_CHUNKS):
+		var chunk_instance = get_child(i)
+		chunk_instance.unload_chunk()
 
 func request_generate(chunk_id: int, x: float, y: float, z: float) -> PackedVector3Array:
 	if print_debug:
@@ -126,8 +139,10 @@ func build_mesh(verts: PackedVector3Array) -> ArrayMesh:
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for v in verts:
 		st.add_vertex(v)
-	st.index()
+	
 	st.generate_normals()
+	st.index()
+	
 	var mesh = st.commit()
 	if print_debug:
 		print("[chunks] mesh built")
@@ -154,16 +169,43 @@ func load_chunk(chunk_id: int) -> void:
 	if print_debug:
 		print("Children count:", get_child_count())
 		print("[chunks] loading chunk ", chunk_id, "...")
+	
 	var chunk_instance = get_child(chunk_id)
+	chunk_instance.load_chunk() # load changes update status etc.
+	
 	if print_debug:
 		print("Node:", chunk_instance)
 
 	var raw_vertices: PackedVector3Array = request_generate(chunk_id, chunk_instance.position.x, chunk_instance.position.y, chunk_instance.position.z)
-	chunk_instance.mesh_instance.mesh = build_mesh(raw_vertices)
+	
+	var mesh = build_mesh(raw_vertices)
+	
+	chunk_instance.mesh_instance.mesh = mesh
+	# assign collision
+	if mesh.get_surface_count() > 0:
+		chunk_instance.collision_shape.shape = mesh.create_trimesh_shape()
+	
 	if print_debug:
 		print("[chunks] chunk ", chunk_id, " loaded")
+	
 
 func unload_chunk(chunk_id: int) -> void:
 	if print_debug:
 		print("[chunks] unloading chunk ", chunk_id, " (TODO)")
-	pass
+	
+	var chunk_instance = get_child(chunk_id)
+	chunk_instance.unload_chunk()
+	
+	if print_debug:
+		print("Node:", chunk_instance)
+	
+	# TODO: instead of full mesh return simplified version, for now empty
+	#var raw_vertices: PackedVector3Array = request_generate(chunk_id, chunk_instance.position.x, chunk_instance.position.y, chunk_instance.position.z)
+	#var mesh = build_mesh(raw_vertices)
+	#chunk_instance.mesh_instance.mesh = mesh
+	# unassign collision
+	chunk_instance.mesh_instance.mesh = null # TODO REMOVE
+	chunk_instance.collision_shape.shape = null
+	
+	if print_debug:
+		print("[chunks] chunk ", chunk_id, " loaded")

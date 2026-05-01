@@ -74,16 +74,16 @@ float get_global_value(float x, float y, float z) {
 
         // mountains
         float _l = -1.000; float _h = 0.000f;
-        float mountain_height_addition = SUFACE_LEVEL_MOUNTAIN_HEIGHT * scale_to_0_1(_l, _h, fnlGetNoise3D(&cellular_eucl_sq_sub_noise, 500.0f * unit_dir_x, 500.0f * unit_dir_y, 500.0f * unit_dir_z));
+        float mountain_height_addition = SUFACE_LEVEL_MOUNTAIN_HEIGHT * scale_to_0_1(_l, _h, fnlGetNoise3D(&simplex2_noise, 500.0f * unit_dir_x, 500.0f * unit_dir_y, 500.0f * unit_dir_z));
         float mountain_val = (PLANET_LEVEL_R - point_r + mountain_height_addition) / CHUNK_CELL_SIDE_SIZE;
 
-        mountain_val = fnlGetNoise3D(&simplex2_noise, 500.0f * unit_dir_x, 500.0f * unit_dir_y, 500.0f * unit_dir_z);
+        // mountain_val = fnlGetNoise3D(&simplex2_noise, 500.0f * unit_dir_x, 500.0f * unit_dir_y, 500.0f * unit_dir_z);
 
         mountain_val = fmin(fmax(mountain_val, -1.0f), 1.0f);
         
         // final value
         float max_val = -1.0f;
-        // max_val = fmax(max_val, surface_val);
+        max_val = fmax(max_val, surface_val);
         max_val = fmax(max_val, mountain_val);
 
         final_val = max_val;
