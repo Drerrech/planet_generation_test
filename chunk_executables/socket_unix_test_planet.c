@@ -6,7 +6,7 @@
 #include <netinet/in.h>
 #include <unistd.h>
 
-#define PORT 9000
+#define PORT 8999
 #define REQ_GENERATE 1
 #define REQ_DELETE 2
 

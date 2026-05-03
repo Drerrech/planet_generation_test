@@ -29,7 +29,7 @@ shape = SubResource("BoxShape3D_sfv1e")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8, 0)
 
 [node name="Camera3D" type="Camera3D" parent="torso/head" unique_id=626330451]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 256)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 64)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="torso" unique_id=1833300516]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
@@ -46,6 +46,7 @@ script = ExtResource("2_abrql")
 [node name="fps_counter" type="Label" parent="canvas" unique_id=1625762232]
 offset_right = 40.0
 offset_bottom = 23.0
+scale = Vector2(2, 2)
 
 [connection signal="area_entered" from="chunk_loading_area3d" to="." method="_on_chunk_loading_area_3d_area_entered"]
 [connection signal="area_exited" from="chunk_loading_area3d" to="." method="_on_chunk_loading_area_3d_area_exited"]

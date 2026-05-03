@@ -36,7 +36,7 @@ func init() -> void:
 
 	if print_debug:
 		print("[chunks] connecting to server...")
-	var err = socket.connect_to_host("127.0.0.1", 9000)
+	var err = socket.connect_to_host("127.0.0.1", 8999)
 	if err != OK:
 		if print_debug:
 			print("[chunks] connect_to_host failed: ", err)
@@ -181,6 +181,7 @@ func load_chunk(chunk_id: int) -> void:
 	var mesh = build_mesh(raw_vertices)
 	
 	chunk_instance.mesh_instance.mesh = mesh
+	chunk_instance.mesh_instance.extra_cull_margin = 32.0
 	# assign collision
 	if mesh.get_surface_count() > 0:
 		chunk_instance.collision_shape.shape = mesh.create_trimesh_shape()
@@ -203,6 +204,7 @@ func unload_chunk(chunk_id: int) -> void:
 	#var raw_vertices: PackedVector3Array = request_generate(chunk_id, chunk_instance.position.x, chunk_instance.position.y, chunk_instance.position.z)
 	#var mesh = build_mesh(raw_vertices)
 	#chunk_instance.mesh_instance.mesh = mesh
+	# no need for extra_cull_margin, shadows aren't importnat, maybe i'll even disable them
 	# unassign collision
 	chunk_instance.mesh_instance.mesh = null # TODO REMOVE
 	chunk_instance.collision_shape.shape = null

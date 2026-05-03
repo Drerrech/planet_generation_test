@@ -36,7 +36,7 @@ void init_noise() {
     cellular_eucl_sq_div_noise.cellular_return_type = FNL_CELLULAR_RETURN_TYPE_DISTANCE2DIV;
 }
 
-const float SUFACE_LEVEL_MOUNTAIN_HEIGHT = 10.f;
+const float SUFACE_LEVEL_MOUNTAIN_HEIGHT = 20.f;
 
 float scale_to_0_1(float l, float h, float val) {
     return (fmin(fmax(val, l), h) - l) / (h - l);
@@ -73,11 +73,11 @@ float get_global_value(float x, float y, float z) {
         surface_val = fmin(fmax(surface_val, -1.0f), 1.0f);
 
         // mountains
-        float _l = -1.000; float _h = 0.000f;
-        float mountain_height_addition = SUFACE_LEVEL_MOUNTAIN_HEIGHT * scale_to_0_1(_l, _h, fnlGetNoise3D(&simplex2_noise, 500.0f * unit_dir_x, 500.0f * unit_dir_y, 500.0f * unit_dir_z));
+        float _l = 0.500f; float _h = 1.000f;
+        float mountain_height_addition = SUFACE_LEVEL_MOUNTAIN_HEIGHT * scale_to_0_1(_l, _h, fnlGetNoise3D(&simplex2_noise, 800.0f * unit_dir_x, 800.0f * unit_dir_y, 800.0f * unit_dir_z));
         float mountain_val = (PLANET_LEVEL_R - point_r + mountain_height_addition) / CHUNK_CELL_SIDE_SIZE;
 
-        // mountain_val = fnlGetNoise3D(&simplex2_noise, 500.0f * unit_dir_x, 500.0f * unit_dir_y, 500.0f * unit_dir_z);
+        mountain_val = fnlGetNoise3D(&simplex2_noise, 500.0f * unit_dir_x, 500.0f * unit_dir_y, 500.0f * unit_dir_z);
 
         mountain_val = fmin(fmax(mountain_val, -1.0f), 1.0f);
         
