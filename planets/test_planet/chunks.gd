@@ -2,7 +2,7 @@
 
 extends Node
 
-const print_debug = false
+const print_debug = true
 
 const chunk_scene := preload("res://chunks/default_chunk/default_chunk.tscn")
 
