@@ -6,7 +6,6 @@
 #include <netinet/in.h>
 #include <unistd.h>
 
-#define PORT 8999
 #define REQ_GENERATE 1
 #define REQ_DELETE 2
 
@@ -81,6 +80,11 @@ int main(int argc, char *argv[]) {
         snprintf(user_dir, sizeof(user_dir), "%s", argv[1]);
     else
         snprintf(user_dir, sizeof(user_dir), "./");
+
+    int port = 8999;
+    if (argc > 2)
+        port = atoi(argv[2]);
+
     // init planet noise
     init_noise();
 
@@ -96,13 +100,13 @@ int main(int argc, char *argv[]) {
 
     struct sockaddr_in addr = {0};
     addr.sin_family      = AF_INET;
-    addr.sin_port        = htons(PORT);
+    addr.sin_port        = htons(port);
     addr.sin_addr.s_addr = INADDR_ANY;
 
     bind(server, (struct sockaddr*)&addr, sizeof(addr));
     listen(server, 1);
 
-    printf("[SERVER] server starting on port %d\n", PORT);
+    printf("[SERVER] server starting on port %d\n", port);
     fflush(stdout);
 
     int client = accept(server, NULL, NULL); // blocks until godot connects

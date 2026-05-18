@@ -1,0 +1,48 @@
+[gd_scene format=3 uid="uid://bqk3k50uyyhef"]
+
+[ext_resource type="Script" uid="uid://03wrywr47y51" path="res://organisation/main_menu/main_menu.gd" id="1_mainmenu"]
+
+[node name="main_menu" type="Control" unique_id=221625199]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_mainmenu")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=300985842]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = -75.0
+offset_right = 100.0
+offset_bottom = 75.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="VBoxContainer" unique_id=1204429145]
+layout_mode = 2
+text = "Planet Generation"
+horizontal_alignment = 1
+
+[node name="IPInput" type="LineEdit" parent="VBoxContainer" unique_id=2028430829]
+layout_mode = 2
+text = "127.0.0.1"
+placeholder_text = "Server IP (for Join)"
+
+[node name="HostButton" type="Button" parent="VBoxContainer" unique_id=1657909938]
+layout_mode = 2
+text = "Host"
+
+[node name="JoinButton" type="Button" parent="VBoxContainer" unique_id=17524348]
+layout_mode = 2
+text = "Join"
+
+[connection signal="pressed" from="VBoxContainer/HostButton" to="." method="_on_host_pressed"]
+[connection signal="pressed" from="VBoxContainer/JoinButton" to="." method="_on_join_pressed"]

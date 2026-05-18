@@ -18,25 +18,24 @@ const VERTEX_SIZE  = 3 * 4  # 3 floats * 4 bytes
 var socket := StreamPeerTCP.new()
 var pid: int = -1
 
+# NOTE: port is hardcoded per role — 8999 for host, 9000 for client.
+# This only supports one host + one client on the same machine.
+# Fix: use a GameState variable or dynamic port negotiation to support more instances.
+var _c_server_port: int:
+	get: return 9080 if not GameState.is_server else 8999
+
 func init() -> void:
 	if print_debug:
 		print("[chunks] spawning server process...")
 	var exe_path = ProjectSettings.globalize_path("res://chunk_executables/test_server")
 	var user_dir = ProjectSettings.globalize_path("user://")
-	pid = OS.create_process(exe_path, [user_dir])
-
-	# TODO REMOVE THIS IS DEBUG
-	#var f = FileAccess.open("user://player_delta/test_planet/0.bin", FileAccess.WRITE)
-	#for i in range(100):
-		#f.store_32(400+i)
-		#f.store_float(1.0)
-	#f.close()
+	pid = OS.create_process(exe_path, [user_dir, str(_c_server_port)])
 
 	await get_tree().create_timer(0.2).timeout
 
 	if print_debug:
 		print("[chunks] connecting to server...")
-	var err = socket.connect_to_host("127.0.0.1", 8999)
+	var err = socket.connect_to_host("127.0.0.1", _c_server_port)
 	if err != OK:
 		if print_debug:
 			print("[chunks] connect_to_host failed: ", err)
@@ -65,7 +64,7 @@ func _exit_tree():
 		pid = -1
 	if print_debug:
 		print("[chunks] server killed")
-	
+
 	# unload all chunks (write delta to memory)
 	for i in range(NUM_CHUNKS):
 		var chunk_instance = get_child(i)
@@ -139,10 +138,10 @@ func build_mesh(verts: PackedVector3Array) -> ArrayMesh:
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for v in verts:
 		st.add_vertex(v)
-	
+
 	st.generate_normals()
 	st.index()
-	
+
 	var mesh = st.commit()
 	if print_debug:
 		print("[chunks] mesh built")
@@ -169,51 +168,83 @@ func load_chunk(chunk_id: int) -> void:
 	if print_debug:
 		print("Children count:", get_child_count())
 		print("[chunks] loading chunk ", chunk_id, "...")
-	
-	var chunk_instance = get_child(chunk_id)
-	chunk_instance.load_chunk() # load changes update status etc.
-	
-	if print_debug:
-		print("Node:", chunk_instance)
 
-	var raw_vertices: PackedVector3Array = request_generate(chunk_id, chunk_instance.position.x, chunk_instance.position.y, chunk_instance.position.z)
-	
+	var chunk_instance = get_child(chunk_id)
+	chunk_instance.load_chunk()
+
+	if not multiplayer.is_server():
+		# TODO DIGGING: if player already has local bin data (visited before), could generate immediately
+		request_bin_data.rpc_id(1, chunk_id)
+		return
+
+	_generate_and_apply_mesh(chunk_id)
+
+
+func _generate_and_apply_mesh(chunk_id: int) -> void:
+	var chunk_instance = get_child(chunk_id)
+
+	var raw_vertices: PackedVector3Array = request_generate(
+		chunk_id,
+		chunk_instance.position.x,
+		chunk_instance.position.y,
+		chunk_instance.position.z
+	)
+	print("[chunks] _generate_and_apply_mesh chunk ", chunk_id, " got ", raw_vertices.size(), " vertices")
+
 	var mesh = build_mesh(raw_vertices)
-	
 	chunk_instance.mesh_instance.mesh = mesh
-	#chunk_instance.mesh_instance.extra_cull_margin = 32.0
-	
-	# assign shader
+
 	var test_shader = ShaderMaterial.new()
 	test_shader.shader = preload("res://planets/test_planet/shaders/test_shader.gdshader")
 	chunk_instance.mesh_instance.material_override = test_shader
-	
-	# assign collision
+
 	if mesh.get_surface_count() > 0:
 		chunk_instance.collision_shape.shape = mesh.create_trimesh_shape()
-	
+
 	if print_debug:
 		print("[chunks] chunk ", chunk_id, " loaded")
-	
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func request_bin_data(chunk_id: int) -> void:
+	print("[chunks] request_bin_data received for chunk ", chunk_id, " from peer ", multiplayer.get_remote_sender_id())
+	# TODO DIGGING: when digging is added, server will also push updated bin data to nearby clients
+	var path = "user://player_delta/test_planet/%d.bin" % chunk_id
+	var data := PackedByteArray()
+	if FileAccess.file_exists(path):
+		var f = FileAccess.open(path, FileAccess.READ)
+		data = f.get_buffer(f.get_length())
+		f.close()
+	var sender_id = multiplayer.get_remote_sender_id()
+	receive_bin_data.rpc_id(sender_id, chunk_id, data)
+
+
+@rpc("authority", "call_remote", "reliable")
+func receive_bin_data(chunk_id: int, data: PackedByteArray) -> void:
+	print("[chunks] receive_bin_data received for chunk ", chunk_id, " data size: ", data.size())
+	# TODO DIGGING: receiving updated bin data mid-game (after a dig) will need to re-generate the mesh
+	if data.size() > 0:
+		var dir = "user://player_delta/test_planet"
+		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir))
+		var f = FileAccess.open("%s/%d.bin" % [dir, chunk_id], FileAccess.WRITE)
+		f.store_buffer(data)
+		f.close()
+	_generate_and_apply_mesh(chunk_id)
+
 
 func unload_chunk(chunk_id: int) -> void:
 	if print_debug:
 		print("[chunks] unloading chunk ", chunk_id, " (TODO)")
-	
+
 	var chunk_instance = get_child(chunk_id)
 	chunk_instance.unload_chunk()
-	
+
 	if print_debug:
 		print("Node:", chunk_instance)
-	
+
 	# TODO: instead of full mesh return simplified version, for now empty
-	#var raw_vertices: PackedVector3Array = request_generate(chunk_id, chunk_instance.position.x, chunk_instance.position.y, chunk_instance.position.z)
-	#var mesh = build_mesh(raw_vertices)
-	#chunk_instance.mesh_instance.mesh = mesh
-	# no need for extra_cull_margin, shadows aren't importnat, maybe i'll even disable them
-	# unassign collision
-	chunk_instance.mesh_instance.mesh = null # TODO REMOVE
+	chunk_instance.mesh_instance.mesh = null
 	chunk_instance.collision_shape.shape = null
-	
+
 	if print_debug:
-		print("[chunks] chunk ", chunk_id, " loaded")
+		print("[chunks] chunk ", chunk_id, " unloaded")

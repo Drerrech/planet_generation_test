@@ -6,15 +6,36 @@
 [sub_resource type="BoxShape3D" id="BoxShape3D_sfv1e"]
 size = Vector3(0.6, 2, 0.6)
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_abrql"]
+albedo_color = Color(0, 1, 0, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_sglur"]
+material = SubResource("StandardMaterial3D_abrql")
+size = Vector3(0.4, 0.4, 0.4)
+
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_symyc"]
 albedo_color = Color(1, 0, 1, 1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_abrql"]
 material = SubResource("StandardMaterial3D_symyc")
-size = Vector3(0.6, 2, 0.6)
+size = Vector3(0.6, 1.5, 0.6)
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_symyc"]
 radius = 128.0
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_abrql"]
+properties/0/path = NodePath(".:position")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:rotation")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+properties/2/path = NodePath("torso:rotation")
+properties/2/spawn = true
+properties/2/replication_mode = 1
+properties/3/path = NodePath("torso/head:rotation")
+properties/3/spawn = true
+properties/3/replication_mode = 1
 
 [node name="player" type="CharacterBody3D" unique_id=1616774405]
 script = ExtResource("1_symyc")
@@ -30,8 +51,11 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8, 0)
 
 [node name="Camera3D" type="Camera3D" parent="torso/head" unique_id=626330451]
 
+[node name="MeshInstance3D" type="MeshInstance3D" parent="torso/head" unique_id=754248066]
+mesh = SubResource("BoxMesh_sglur")
+
 [node name="MeshInstance3D" type="MeshInstance3D" parent="torso" unique_id=1833300516]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)
 mesh = SubResource("BoxMesh_abrql")
 
 [node name="chunk_loading_area3d" type="Area3D" parent="." unique_id=1922640290 groups=["player"]]
@@ -46,6 +70,9 @@ script = ExtResource("2_abrql")
 offset_right = 40.0
 offset_bottom = 23.0
 scale = Vector2(2, 2)
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="." unique_id=1575176974]
+replication_config = SubResource("SceneReplicationConfig_abrql")
 
 [connection signal="area_entered" from="chunk_loading_area3d" to="." method="_on_chunk_loading_area_3d_area_entered"]
 [connection signal="area_exited" from="chunk_loading_area3d" to="." method="_on_chunk_loading_area_3d_area_exited"]

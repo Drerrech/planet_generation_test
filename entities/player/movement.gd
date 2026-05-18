@@ -18,9 +18,14 @@ var sprinting = false
 var current_speed = SPEED
 
 func _ready():
+	if not is_multiplayer_authority():
+		camera.current = false
+		return
+	camera.make_current()
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _input(event):
+	if not is_multiplayer_authority(): return
 	if event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
 		torso.rotate_y(deg_to_rad(event.relative.x * MOUSE_SENSITIVITY * -1))
 		head.rotate_x(deg_to_rad(event.relative.y * MOUSE_SENSITIVITY * -1))
@@ -33,24 +38,22 @@ func update_inputs():
 	sprinting = Input.is_action_pressed("shift")
 
 func _physics_process(delta):
+	if not is_multiplayer_authority(): return
+
 	var up = (global_position - planet_center).normalized()
 
-	# align player basis to planet surface using player's own forward — stable, no feedback loop
 	var new_basis = Basis()
 	new_basis.y = up
-	new_basis.x = basis.z.cross(up).normalized()
-	new_basis.z = up.cross(new_basis.x).normalized()
+	new_basis.x = up.cross(basis.z).normalized()
+	new_basis.z = new_basis.x.cross(up).normalized()
 	basis = new_basis.orthonormalized()
 
-	# decompose velocity into surface-normal and tangent components
 	var vertical_vel = velocity.dot(up)
 	var horizontal_vel = velocity - up * vertical_vel
 
-	# gravity
 	if not is_on_floor():
 		vertical_vel -= gravity * delta
 
-	# jump
 	if jumping and is_on_floor():
 		vertical_vel = JUMP_VELOCITY
 		jumping = false
@@ -58,7 +61,6 @@ func _physics_process(delta):
 	update_inputs()
 	current_speed = SPEED * (SPRINT_SPEED_FACTOR if sprinting else 1.0)
 
-	# movement relative to torso direction in world space
 	var direction = (torso.global_basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
 
 	if direction.length() > 0:
@@ -67,24 +69,21 @@ func _physics_process(delta):
 		horizontal_vel = horizontal_vel.move_toward(Vector3.ZERO, current_speed)
 
 	velocity = horizontal_vel + up * vertical_vel
-
 	up_direction = up
 	move_and_slide()
 
 
 func _on_chunk_loading_area_3d_area_entered(area: Area3D) -> void:
+	if not is_multiplayer_authority(): return
 	if area.is_in_group("chunk"):
-		# load this chunk through its parent (chunks)
 		var chunk_instance = area.get_parent()
 		var chunks = chunk_instance.get_parent()
-		
 		chunks.load_chunk(chunk_instance.chunk_id)
 
 
 func _on_chunk_loading_area_3d_area_exited(area: Area3D) -> void:
+	if not is_multiplayer_authority(): return
 	if area.is_in_group("chunk"):
-		# unload this chunk through its parent (chunks)
 		var chunk_instance = area.get_parent()
 		var chunks = chunk_instance.get_parent()
-		
 		chunks.unload_chunk(chunk_instance.chunk_id)

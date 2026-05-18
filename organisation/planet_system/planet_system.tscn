@@ -1,13 +1,14 @@
 [gd_scene format=3 uid="uid://b3gl1ecebk584"]
 
-[ext_resource type="PackedScene" uid="uid://bfo37mvk2xobl" path="res://entities/player/player.tscn" id="1_llsf0"]
 [ext_resource type="PackedScene" uid="uid://cjptql413evb1" path="res://planets/test_planet/test_planet.tscn" id="2_g58se"]
+[ext_resource type="Script" uid="uid://defsv81ghy7r3" path="res://organisation/planet_system/planet_system.gd" id="3_ps001"]
 
 [node name="planet_system" type="Node" unique_id=624921577]
+script = ExtResource("3_ps001")
 
 [node name="players" type="Node" parent="." unique_id=1443106170]
 
-[node name="player" parent="players" unique_id=1616774405 instance=ExtResource("1_llsf0")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 300, 0)
+[node name="MultiplayerSpawner" type="MultiplayerSpawner" parent="players" unique_id=1296884855]
+spawn_path = NodePath("..")
 
 [node name="test_planet" parent="." unique_id=673781389 instance=ExtResource("2_g58se")]
