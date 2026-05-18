@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <math.h>
 
-
 // defining planet generation logic
 // -1 - empty
 // +1 - full
@@ -67,19 +66,13 @@ float get_global_value(float x, float y, float z) {
     }
     
     // surface and mountains
-    else if (point_r < 1.05f * PLANET_LEVEL_R) {
+    else if (point_r < 1.5f * PLANET_LEVEL_R) {
         // surface
         float surface_val = (PLANET_LEVEL_R - point_r) / CHUNK_CELL_SIDE_SIZE;
         surface_val = fmin(fmax(surface_val, -1.0f), 1.0f);
 
         // mountains
-        float _l = 0.500f; float _h = 1.000f;
-        float mountain_height_addition = SUFACE_LEVEL_MOUNTAIN_HEIGHT * scale_to_0_1(_l, _h, fnlGetNoise3D(&simplex2_noise, 800.0f * unit_dir_x, 800.0f * unit_dir_y, 800.0f * unit_dir_z));
-        float mountain_val = (PLANET_LEVEL_R - point_r + mountain_height_addition) / CHUNK_CELL_SIDE_SIZE;
-
-        mountain_val = fnlGetNoise3D(&simplex2_noise, 500.0f * unit_dir_x, 500.0f * unit_dir_y, 500.0f * unit_dir_z);
-
-        mountain_val = fmin(fmax(mountain_val, -1.0f), 1.0f);
+        float mountain_val = fnlGetNoise3D(&simplex2_noise, 4.f * x, 4.f * y, 4.f * z);
         
         // final value
         float max_val = -1.0f;

@@ -11,7 +11,8 @@ ground_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
 sky_material = SubResource("ProceduralSkyMaterial_vm76h")
 
 [sub_resource type="Environment" id="Environment_cpskl"]
-background_mode = 2
+background_mode = 1
+background_color = Color(0.45613867, 0.5276381, 0.65843236, 1)
 sky = SubResource("Sky_7gi6k")
 tonemap_mode = 2
 glow_enabled = true
@@ -26,5 +27,5 @@ environment = SubResource("Environment_cpskl")
 transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.50000006, 0.75, -0.43301266, 0, 0, 0)
 shadow_enabled = true
 
-[node name="chunks" type="Node" parent="." unique_id=1791254985]
+[node name="chunks" type="Node3D" parent="." unique_id=1053644725]
 script = ExtResource("2_vm76h")

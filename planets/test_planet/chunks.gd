@@ -1,4 +1,4 @@
-#@tool
+@tool
 
 extends Node
 
@@ -7,9 +7,9 @@ const print_debug = false
 const chunk_scene := preload("res://chunks/default_chunk/default_chunk.tscn")
 
 # NOTE: MUST BE THE SAME AS EXECUTABLE
-const NUM_CHUNKS_SIDE = Vector3i(32, 32, 32)
+const NUM_CHUNKS_SIDE = Vector3i(16, 16, 16) #Vector3i(32, 32, 32)
 const NUM_CHUNKS = NUM_CHUNKS_SIDE.x * NUM_CHUNKS_SIDE.y * NUM_CHUNKS_SIDE.z
-const CHUNK_SIZE = Vector3(16.0, 16.0, 16.0)
+const CHUNK_SIZE = Vector3(32.0, 32.0, 32.0) # Vector3(16.0, 16.0, 16.0)
 
 const REQ_GENERATE = 1
 const REQ_DELETE   = 2
@@ -181,7 +181,13 @@ func load_chunk(chunk_id: int) -> void:
 	var mesh = build_mesh(raw_vertices)
 	
 	chunk_instance.mesh_instance.mesh = mesh
-	chunk_instance.mesh_instance.extra_cull_margin = 32.0
+	#chunk_instance.mesh_instance.extra_cull_margin = 32.0
+	
+	# assign shader
+	var test_shader = ShaderMaterial.new()
+	test_shader.shader = preload("res://planets/test_planet/shaders/test_shader.gdshader")
+	chunk_instance.mesh_instance.material_override = test_shader
+	
 	# assign collision
 	if mesh.get_surface_count() > 0:
 		chunk_instance.collision_shape.shape = mesh.create_trimesh_shape()
