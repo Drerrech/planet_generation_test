@@ -189,7 +189,8 @@ func _generate_and_apply_mesh(chunk_id: int) -> void:
 		chunk_instance.position.y,
 		chunk_instance.position.z
 	)
-	print("[chunks] _generate_and_apply_mesh chunk ", chunk_id, " got ", raw_vertices.size(), " vertices")
+	if print_debug:
+		print("[chunks] _generate_and_apply_mesh chunk ", chunk_id, " got ", raw_vertices.size(), " vertices")
 
 	var mesh = build_mesh(raw_vertices)
 	chunk_instance.mesh_instance.mesh = mesh
@@ -207,7 +208,8 @@ func _generate_and_apply_mesh(chunk_id: int) -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func request_bin_data(chunk_id: int) -> void:
-	print("[chunks] request_bin_data received for chunk ", chunk_id, " from peer ", multiplayer.get_remote_sender_id())
+	if print_debug:
+		print("[chunks] request_bin_data received for chunk ", chunk_id, " from peer ", multiplayer.get_remote_sender_id())
 	# TODO DIGGING: when digging is added, server will also push updated bin data to nearby clients
 	var path = "user://player_delta/test_planet/%d.bin" % chunk_id
 	var data := PackedByteArray()
@@ -221,7 +223,8 @@ func request_bin_data(chunk_id: int) -> void:
 
 @rpc("authority", "call_remote", "reliable")
 func receive_bin_data(chunk_id: int, data: PackedByteArray) -> void:
-	print("[chunks] receive_bin_data received for chunk ", chunk_id, " data size: ", data.size())
+	if print_debug:
+		print("[chunks] receive_bin_data received for chunk ", chunk_id, " data size: ", data.size())
 	# TODO DIGGING: receiving updated bin data mid-game (after a dig) will need to re-generate the mesh
 	if data.size() > 0:
 		var dir = "user://player_delta/test_planet"
