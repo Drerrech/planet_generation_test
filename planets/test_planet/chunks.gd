@@ -18,7 +18,7 @@ const VERTEX_SIZE  = 3 * 4  # 3 floats * 4 bytes
 var socket := StreamPeerTCP.new()
 var pid: int = -1
 
-# NOTE: port is hardcoded per role — 8999 for host, 9000 for client.
+# NOTE: port is hardcoded per role — 8999 for host, 9080 for client.
 # This only supports one host + one client on the same machine.
 # Fix: use a GameState variable or dynamic port negotiation to support more instances.
 var _c_server_port: int:
@@ -64,11 +64,6 @@ func _exit_tree():
 		pid = -1
 	if print_debug:
 		print("[chunks] server killed")
-
-	# unload all chunks (write delta to memory)
-	for i in range(NUM_CHUNKS):
-		var chunk_instance = get_child(i)
-		chunk_instance.unload_chunk()
 
 func request_generate(chunk_id: int, x: float, y: float, z: float) -> PackedVector3Array:
 	if print_debug:
@@ -173,10 +168,10 @@ func load_chunk(chunk_id: int) -> void:
 	chunk_instance.load_chunk()
 
 	if not multiplayer.is_server():
-		# TODO DIGGING: if player already has local bin data (visited before), could generate immediately
 		request_bin_data.rpc_id(1, chunk_id)
 		return
 
+	_load_chunk_delta(chunk_id)
 	_generate_and_apply_mesh(chunk_id)
 
 
@@ -206,11 +201,69 @@ func _generate_and_apply_mesh(chunk_id: int) -> void:
 		print("[chunks] chunk ", chunk_id, " loaded")
 
 
+# --- bin file helpers ---
+
+func _load_chunk_delta(chunk_id: int) -> void:
+	var chunk_instance = get_child(chunk_id)
+	chunk_instance.delta = {}
+	var path = "user://player_delta/test_planet/%d.bin" % chunk_id
+	if not FileAccess.file_exists(path):
+		return
+	var f = FileAccess.open(path, FileAccess.READ)
+	while f.get_position() < f.get_length():
+		var idx = f.get_32()
+		var val = f.get_float()
+		chunk_instance.delta[idx] = val
+	f.close()
+
+func _write_chunk_bin(chunk_id: int) -> void:
+	var chunk_instance = get_child(chunk_id)
+	var dir = "user://player_delta/test_planet"
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir))
+	var f = FileAccess.open("%s/%d.bin" % [dir, chunk_id], FileAccess.WRITE)
+	for idx in chunk_instance.delta:
+		f.store_32(idx)
+		f.store_float(chunk_instance.delta[idx])
+	f.close()
+
+
+# --- chunk change RPCs ---
+
+func on_chunk_changed(chunk_id: int, incoming_delta: Dictionary) -> void:
+	if not multiplayer.is_server():
+		_request_chunk_change.rpc_id(1, chunk_id, incoming_delta)
+		return
+	_server_apply_chunk_change(chunk_id, incoming_delta)
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_chunk_change(chunk_id: int, incoming_delta: Dictionary) -> void:
+	# TODO DIGGING: validate changes server-side (anti-cheat)
+	var chunk_instance = get_child(chunk_id)
+	for idx in incoming_delta:
+		chunk_instance.delta[idx] = incoming_delta[idx]
+	_server_apply_chunk_change(chunk_id, incoming_delta)
+
+func _server_apply_chunk_change(chunk_id: int, incoming_delta: Dictionary) -> void:
+	_write_chunk_bin(chunk_id)
+	_generate_and_apply_mesh(chunk_id)
+	_receive_chunk_change.rpc(chunk_id, incoming_delta)
+
+@rpc("authority", "call_remote", "reliable")
+func _receive_chunk_change(chunk_id: int, incoming_delta: Dictionary) -> void:
+	# TODO DIGGING: client receives authoritative dig change from server
+	var chunk_instance = get_child(chunk_id)
+	for idx in incoming_delta:
+		chunk_instance.delta[idx] = incoming_delta[idx]
+	_write_chunk_bin(chunk_id)
+	_generate_and_apply_mesh(chunk_id)
+
+
+# --- bin data RPCs (used on chunk load) ---
+
 @rpc("any_peer", "call_remote", "reliable")
 func request_bin_data(chunk_id: int) -> void:
 	if print_debug:
 		print("[chunks] request_bin_data received for chunk ", chunk_id, " from peer ", multiplayer.get_remote_sender_id())
-	# TODO DIGGING: when digging is added, server will also push updated bin data to nearby clients
 	var path = "user://player_delta/test_planet/%d.bin" % chunk_id
 	var data := PackedByteArray()
 	if FileAccess.file_exists(path):
@@ -220,18 +273,25 @@ func request_bin_data(chunk_id: int) -> void:
 	var sender_id = multiplayer.get_remote_sender_id()
 	receive_bin_data.rpc_id(sender_id, chunk_id, data)
 
-
 @rpc("authority", "call_remote", "reliable")
 func receive_bin_data(chunk_id: int, data: PackedByteArray) -> void:
 	if print_debug:
 		print("[chunks] receive_bin_data received for chunk ", chunk_id, " data size: ", data.size())
-	# TODO DIGGING: receiving updated bin data mid-game (after a dig) will need to re-generate the mesh
+	var chunk_instance = get_child(chunk_id)
+	chunk_instance.delta = {}
 	if data.size() > 0:
 		var dir = "user://player_delta/test_planet"
 		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir))
 		var f = FileAccess.open("%s/%d.bin" % [dir, chunk_id], FileAccess.WRITE)
 		f.store_buffer(data)
 		f.close()
+		# populate in-memory delta from received bytes
+		var offset = 0
+		while offset + 8 <= data.size():
+			var idx = data.decode_s32(offset)
+			var val = data.decode_float(offset + 4)
+			chunk_instance.delta[idx] = val
+			offset += 8
 	_generate_and_apply_mesh(chunk_id)
 
 
