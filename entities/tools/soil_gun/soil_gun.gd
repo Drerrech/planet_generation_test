@@ -81,3 +81,4 @@ func shoot(time_delta: float) -> void:
 			ChunkModification.spherical_uniform_add_delta(chunks_ref, collision_point, r, soil_delta * time_delta)
 		2:  # smooth sphere
 			ChunkModification.spherical_smooth_add_delta(chunks_ref, collision_point, r, soil_delta * time_delta)
+		

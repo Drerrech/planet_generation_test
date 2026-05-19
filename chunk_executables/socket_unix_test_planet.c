@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
@@ -18,7 +19,8 @@ typedef struct {
     float y;
     float z;
 
-    float *arr;
+    float *base_arr;  // pure noise, never modified
+    float *arr;       // working array: noise + delta
 
     VertexArray v_a;
 } Chunk;
@@ -33,9 +35,11 @@ Chunk* make_chunk(int chunk_id, float x, float y, float z) {
     c->z = z;
 
 
-    c->arr = malloc(CHUNK_SIDE_SIZE * CHUNK_SIDE_SIZE * CHUNK_SIDE_SIZE * sizeof(float));
-    // fill with generation
-    fill_chunk_array(c->arr, x, y, z);
+    int arr_size = CHUNK_SIDE_SIZE * CHUNK_SIDE_SIZE * CHUNK_SIDE_SIZE;
+    c->base_arr = malloc(arr_size * sizeof(float));
+    fill_chunk_array(c->base_arr, x, y, z);
+    c->arr = malloc(arr_size * sizeof(float));
+    memcpy(c->arr, c->base_arr, arr_size * sizeof(float));
 
     // apply player changes
     char path[256];
@@ -59,6 +63,7 @@ Chunk* make_chunk(int chunk_id, float x, float y, float z) {
 }
 
 void delete_chunk(Chunk *c) {
+    free(c->base_arr);
     free(c->arr);
     delete_vertex_array(&(c->v_a));
     free(c);
@@ -153,15 +158,35 @@ int main(int argc, char *argv[]) {
                 float chunk_pos[3];
                 recv(client, chunk_pos, sizeof(chunk_pos), MSG_WAITALL);
 
-                if (chunks[chunk_id] != NULL) {
-                    delete_chunk(chunks[chunk_id]);
-                }
-                Chunk *c_pointer = make_chunk(chunk_id, chunk_pos[0], chunk_pos[1], chunk_pos[2]);
-                chunks[chunk_id] = c_pointer;
+                Chunk *c = chunks[chunk_id];
+                if (c == NULL) {
+                    // chunk not cached yet, generate from scratch
+                    c = make_chunk(chunk_id, chunk_pos[0], chunk_pos[1], chunk_pos[2]);
+                    chunks[chunk_id] = c;
+                } else {
+                    // restore base noise, apply delta, remarch
+                    int arr_size = CHUNK_SIDE_SIZE * CHUNK_SIDE_SIZE * CHUNK_SIDE_SIZE;
+                    memcpy(c->arr, c->base_arr, arr_size * sizeof(float));
 
-                send_all(client, &c_pointer->v_a.size, sizeof(c_pointer->v_a.size));
-                send_all(client, c_pointer->v_a.v_arr, (size_t)c_pointer->v_a.size * sizeof(Vertex));
-                // no voxel array — caller already has it locally
+                    char path[256];
+                    snprintf(path, sizeof(path), "%splayer_delta/test_planet/%d.bin", user_dir, chunk_id);
+                    FILE *f = fopen(path, "rb");
+                    if (f != NULL) {
+                        int point_idx;
+                        float point_val;
+                        while (fread(&point_idx, sizeof(int), 1, f) == 1) {
+                            fread(&point_val, sizeof(float), 1, f);
+                            c->arr[point_idx] = point_val;
+                        }
+                        fclose(f);
+                    }
+
+                    delete_vertex_array(&c->v_a);
+                    c->v_a = march_and_build_mesh(c->arr);
+                }
+
+                send_all(client, &c->v_a.size, sizeof(c->v_a.size));
+                send_all(client, c->v_a.v_arr, (size_t)c->v_a.size * sizeof(Vertex));
                 break;
             }
             case REQ_DELETE: {
