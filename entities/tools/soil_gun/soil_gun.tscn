@@ -1,0 +1,11 @@
+[gd_scene format=3 uid="uid://bp4b1xfm3erq2"]
+
+[ext_resource type="Script" uid="uid://bfixjq7p5l2dq" path="res://entities/tools/soil_gun/soil_gun.gd" id="1_sm5yw"]
+
+[node name="soil_gun" type="Node3D" unique_id=2142163457]
+script = ExtResource("1_sm5yw")
+
+[node name="RayCast3D" type="RayCast3D" parent="." unique_id=644679394]
+target_position = Vector3(0, 0, -8)
+
+[node name="indicators" type="Node3D" parent="." unique_id=2044810934]

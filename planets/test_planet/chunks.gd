@@ -2,7 +2,7 @@
 
 extends Node
 
-const print_debug = true
+const print_debug = false
 
 const chunk_scene := preload("res://chunks/default_chunk/default_chunk.tscn")
 
@@ -13,7 +13,10 @@ const CHUNK_SIZE = Vector3(32.0, 32.0, 32.0) # Vector3(16.0, 16.0, 16.0)
 
 const REQ_GENERATE = 1
 const REQ_DELETE   = 2
+const REQ_UPDATE   = 3
 const VERTEX_SIZE  = 3 * 4  # 3 floats * 4 bytes
+const CHUNK_SIDE_SIZE = 33  # must match CHUNK_SIDE_SIZE in C
+const CHUNK_ARRAY_SIZE = CHUNK_SIDE_SIZE * CHUNK_SIDE_SIZE * CHUNK_SIDE_SIZE
 
 var socket := StreamPeerTCP.new()
 var pid: int = -1
@@ -65,18 +68,7 @@ func _exit_tree():
 	if print_debug:
 		print("[chunks] server killed")
 
-func request_generate(chunk_id: int, x: float, y: float, z: float) -> PackedVector3Array:
-	if print_debug:
-		print("[chunks] requesting generation for chunk ", chunk_id, " at (", x, ", ", y, ", ", z, ")")
-
-	socket.put_u8(REQ_GENERATE)
-	socket.put_32(chunk_id)
-	socket.put_float(x)
-	socket.put_float(y)
-	socket.put_float(z)
-	socket.poll()  # flush send buffer
-
-	# spin until vertex count arrives — on localhost this is microseconds
+func _recv_vertices() -> PackedVector3Array:
 	var deadline = Time.get_ticks_msec() + 5000
 	while socket.get_available_bytes() < 4:
 		socket.poll()
@@ -87,8 +79,6 @@ func request_generate(chunk_id: int, x: float, y: float, z: float) -> PackedVect
 			print("[chunks] ERROR: timed out waiting for vertex count")
 			return PackedVector3Array()
 	var vertex_count = socket.get_32()
-	if print_debug:
-		print("[chunks] chunk ", chunk_id, " expecting ", vertex_count, " vertices")
 
 	var total_bytes = vertex_count * VERTEX_SIZE
 	var bytes := PackedByteArray()
@@ -110,7 +100,7 @@ func request_generate(chunk_id: int, x: float, y: float, z: float) -> PackedVect
 					print("[chunks] ERROR: get_data failed: ", result[0])
 				return PackedVector3Array()
 			bytes.append_array(result[1])
-			deadline = Time.get_ticks_msec() + 10000  # reset timeout while data flows
+			deadline = Time.get_ticks_msec() + 10000
 
 	var verts := PackedVector3Array()
 	verts.resize(vertex_count)
@@ -121,10 +111,65 @@ func request_generate(chunk_id: int, x: float, y: float, z: float) -> PackedVect
 			bytes.decode_float(offset + 4),
 			bytes.decode_float(offset + 8)
 		)
+	return verts
 
+
+func request_generate(chunk_id: int, x: float, y: float, z: float) -> Dictionary:
+	if print_debug:
+		print("[chunks] requesting generation for chunk ", chunk_id, " at (", x, ", ", y, ", ", z, ")")
+
+	socket.put_u8(REQ_GENERATE)
+	socket.put_32(chunk_id)
+	socket.put_float(x)
+	socket.put_float(y)
+	socket.put_float(z)
+	socket.poll()
+
+	var verts = _recv_vertices()
 	if print_debug:
 		print("[chunks] chunk ", chunk_id, " received ", verts.size(), " vertices")
-	return verts
+
+	# read full voxel array (only sent on initial load)
+	var array_total_bytes = CHUNK_ARRAY_SIZE * 4
+	var array_bytes := PackedByteArray()
+	var deadline = Time.get_ticks_msec() + 10000
+	while array_bytes.size() < array_total_bytes:
+		socket.poll()
+		if socket.get_status() != StreamPeerTCP.STATUS_CONNECTED:
+			print("[chunks] ERROR: socket disconnected waiting for point values")
+			return {"vertices": verts, "point_values": PackedFloat32Array()}
+		if Time.get_ticks_msec() > deadline:
+			print("[chunks] ERROR: timed out waiting for point values")
+			return {"vertices": verts, "point_values": PackedFloat32Array()}
+		var available = socket.get_available_bytes()
+		if available > 0:
+			var to_read = min(available, array_total_bytes - array_bytes.size())
+			var result = socket.get_data(to_read)
+			if result[0] != OK:
+				return {"vertices": verts, "point_values": PackedFloat32Array()}
+			array_bytes.append_array(result[1])
+			deadline = Time.get_ticks_msec() + 10000
+
+	var point_values := PackedFloat32Array()
+	point_values.resize(CHUNK_ARRAY_SIZE)
+	for i in range(CHUNK_ARRAY_SIZE):
+		point_values[i] = array_bytes.decode_float(i * 4)
+
+	return {"vertices": verts, "point_values": point_values}
+
+
+func request_update(chunk_id: int, x: float, y: float, z: float) -> PackedVector3Array:
+	if print_debug:
+		print("[chunks] requesting update for chunk ", chunk_id)
+
+	socket.put_u8(REQ_UPDATE)
+	socket.put_32(chunk_id)
+	socket.put_float(x)
+	socket.put_float(y)
+	socket.put_float(z)
+	socket.poll()
+
+	return _recv_vertices()
 
 func build_mesh(verts: PackedVector3Array) -> ArrayMesh:
 	if print_debug:
@@ -175,18 +220,8 @@ func load_chunk(chunk_id: int) -> void:
 	_generate_and_apply_mesh(chunk_id)
 
 
-func _generate_and_apply_mesh(chunk_id: int) -> void:
+func _apply_mesh(chunk_id: int, raw_vertices: PackedVector3Array) -> void:
 	var chunk_instance = get_child(chunk_id)
-
-	var raw_vertices: PackedVector3Array = request_generate(
-		chunk_id,
-		chunk_instance.position.x,
-		chunk_instance.position.y,
-		chunk_instance.position.z
-	)
-	if print_debug:
-		print("[chunks] _generate_and_apply_mesh chunk ", chunk_id, " got ", raw_vertices.size(), " vertices")
-
 	var mesh = build_mesh(raw_vertices)
 	chunk_instance.mesh_instance.mesh = mesh
 
@@ -197,8 +232,32 @@ func _generate_and_apply_mesh(chunk_id: int) -> void:
 	if mesh.get_surface_count() > 0:
 		chunk_instance.collision_shape.shape = mesh.create_trimesh_shape()
 
+
+func _generate_and_apply_mesh(chunk_id: int) -> void:
+	var chunk_instance = get_child(chunk_id)
+	var result = request_generate(
+		chunk_id,
+		chunk_instance.position.x,
+		chunk_instance.position.y,
+		chunk_instance.position.z
+	)
+	chunk_instance.point_values = result.point_values
 	if print_debug:
-		print("[chunks] chunk ", chunk_id, " loaded")
+		print("[chunks] _generate_and_apply_mesh chunk ", chunk_id, " got ", result.vertices.size(), " vertices")
+	_apply_mesh(chunk_id, result.vertices)
+
+
+func _update_chunk_mesh(chunk_id: int) -> void:
+	var chunk_instance = get_child(chunk_id)
+	var raw_vertices = request_update(
+		chunk_id,
+		chunk_instance.position.x,
+		chunk_instance.position.y,
+		chunk_instance.position.z
+	)
+	if print_debug:
+		print("[chunks] _update_chunk_mesh chunk ", chunk_id, " got ", raw_vertices.size(), " vertices")
+	_apply_mesh(chunk_id, raw_vertices)
 
 
 # --- bin file helpers ---
@@ -245,17 +304,17 @@ func _request_chunk_change(chunk_id: int, incoming_delta: Dictionary) -> void:
 
 func _server_apply_chunk_change(chunk_id: int, incoming_delta: Dictionary) -> void:
 	_write_chunk_bin(chunk_id)
-	_generate_and_apply_mesh(chunk_id)
+	_update_chunk_mesh(chunk_id)
 	_receive_chunk_change.rpc(chunk_id, incoming_delta)
 
 @rpc("authority", "call_remote", "reliable")
 func _receive_chunk_change(chunk_id: int, incoming_delta: Dictionary) -> void:
-	# TODO DIGGING: client receives authoritative dig change from server
 	var chunk_instance = get_child(chunk_id)
 	for idx in incoming_delta:
 		chunk_instance.delta[idx] = incoming_delta[idx]
+		chunk_instance.point_values[idx] = incoming_delta[idx]
 	_write_chunk_bin(chunk_id)
-	_generate_and_apply_mesh(chunk_id)
+	_update_chunk_mesh(chunk_id)
 
 
 # --- bin data RPCs (used on chunk load) ---
@@ -297,17 +356,17 @@ func receive_bin_data(chunk_id: int, data: PackedByteArray) -> void:
 
 func unload_chunk(chunk_id: int) -> void:
 	if print_debug:
-		print("[chunks] unloading chunk ", chunk_id, " (TODO)")
+		print("[chunks] unloading chunk ", chunk_id)
 
 	var chunk_instance = get_child(chunk_id)
 	chunk_instance.unload_chunk()
-
-	if print_debug:
-		print("Node:", chunk_instance)
-
-	# TODO: instead of full mesh return simplified version, for now empty
 	chunk_instance.mesh_instance.mesh = null
 	chunk_instance.collision_shape.shape = null
+
+	if socket.get_status() == StreamPeerTCP.STATUS_CONNECTED:
+		socket.put_u8(REQ_DELETE)
+		socket.put_32(chunk_id)
+		socket.poll()
 
 	if print_debug:
 		print("[chunks] chunk ", chunk_id, " unloaded")

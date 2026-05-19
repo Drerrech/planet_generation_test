@@ -7,7 +7,8 @@
 #include <unistd.h>
 
 #define REQ_GENERATE 1
-#define REQ_DELETE 2
+#define REQ_DELETE   2
+#define REQ_UPDATE   3
 
 static char user_dir[512];
 
@@ -142,11 +143,34 @@ int main(int argc, char *argv[]) {
                 //send(client, c_pointer->v_a.v_arr, c_pointer->v_a.size * sizeof(Vertex), 0);
                 send_all(client, &c_pointer->v_a.size, sizeof(c_pointer->v_a.size));
                 send_all(client, c_pointer->v_a.v_arr, (size_t)c_pointer->v_a.size * sizeof(Vertex));
+                // send full voxel array so godot can query point values without round trips
+                send_all(client, c_pointer->arr, CHUNK_SIDE_SIZE * CHUNK_SIDE_SIZE * CHUNK_SIDE_SIZE * sizeof(float));
+                break;
+            }
+            case REQ_UPDATE: {
+                int chunk_id;
+                recv(client, &chunk_id, sizeof(chunk_id), MSG_WAITALL);
+                float chunk_pos[3];
+                recv(client, chunk_pos, sizeof(chunk_pos), MSG_WAITALL);
+
+                if (chunks[chunk_id] != NULL) {
+                    delete_chunk(chunks[chunk_id]);
+                }
+                Chunk *c_pointer = make_chunk(chunk_id, chunk_pos[0], chunk_pos[1], chunk_pos[2]);
+                chunks[chunk_id] = c_pointer;
+
+                send_all(client, &c_pointer->v_a.size, sizeof(c_pointer->v_a.size));
+                send_all(client, c_pointer->v_a.v_arr, (size_t)c_pointer->v_a.size * sizeof(Vertex));
+                // no voxel array — caller already has it locally
                 break;
             }
             case REQ_DELETE: {
-                //TODO
-                // chunk will get freed, list of verticies with a simplified mesh will be returned
+                int chunk_id;
+                recv(client, &chunk_id, sizeof(chunk_id), MSG_WAITALL);
+                if (chunks[chunk_id] != NULL) {
+                    delete_chunk(chunks[chunk_id]);
+                    chunks[chunk_id] = NULL;
+                }
                 break;
             }
         }

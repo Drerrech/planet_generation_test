@@ -2,6 +2,8 @@
 
 [ext_resource type="Script" uid="uid://dm42ij4q1xquk" path="res://entities/player/movement.gd" id="1_symyc"]
 [ext_resource type="Script" uid="uid://c6uwkgon46pa" path="res://entities/player/canvas.gd" id="2_abrql"]
+[ext_resource type="Script" uid="uid://b47jlgt3iq40n" path="res://entities/player/tools.gd" id="2_bls4j"]
+[ext_resource type="PackedScene" uid="uid://bp4b1xfm3erq2" path="res://entities/tools/soil_gun/soil_gun.tscn" id="3_fkugw"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_sfv1e"]
 size = Vector3(0.6, 2, 0.6)
@@ -13,12 +15,15 @@ albedo_color = Color(0, 1, 0, 1)
 material = SubResource("StandardMaterial3D_abrql")
 size = Vector3(0.4, 0.4, 0.4)
 
+[sub_resource type="BoxMesh" id="BoxMesh_bls4j"]
+size = Vector3(0.05, 0.05, 0.6)
+
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_symyc"]
 albedo_color = Color(1, 0, 1, 1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_abrql"]
 material = SubResource("StandardMaterial3D_symyc")
-size = Vector3(0.6, 1.5, 0.2)
+size = Vector3(0.6, 1.5, 0.6)
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_symyc"]
 radius = 128.0
@@ -51,8 +56,17 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8, 0)
 
 [node name="Camera3D" type="Camera3D" parent="torso/head" unique_id=626330451]
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="torso/head" unique_id=754248066]
+[node name="head" type="MeshInstance3D" parent="torso/head" unique_id=754248066]
 mesh = SubResource("BoxMesh_sglur")
+
+[node name="nose" type="MeshInstance3D" parent="torso/head" unique_id=706023167]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.1)
+mesh = SubResource("BoxMesh_bls4j")
+
+[node name="tools" type="Node3D" parent="torso/head" unique_id=323578893]
+script = ExtResource("2_bls4j")
+
+[node name="soil_gun" parent="torso/head/tools" unique_id=2142163457 instance=ExtResource("3_fkugw")]
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="torso" unique_id=1833300516]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)

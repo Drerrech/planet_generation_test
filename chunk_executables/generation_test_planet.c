@@ -62,24 +62,29 @@ float get_global_value(float x, float y, float z) {
 
     // TODO: inner layers
     if (point_r < 0.95f * PLANET_LEVEL_R) {
-        final_val = -1.0f;
+        final_val = 1.0f;
     }
     
     // surface and mountains
-    else if (point_r < 1.5f * PLANET_LEVEL_R) {
+    else if (point_r < 1.05f * PLANET_LEVEL_R) {
         // surface
         float surface_val = (PLANET_LEVEL_R - point_r) / CHUNK_CELL_SIDE_SIZE;
         surface_val = fmin(fmax(surface_val, -1.0f), 1.0f);
 
         // mountains
-        float mountain_val = fnlGetNoise3D(&simplex2_noise, 4.f * x, 4.f * y, 4.f * z);
+        // float mountain_val = fnlGetNoise3D(&simplex2_noise, 4.f * x, 4.f * y, 4.f * z);
         
         // final value
         float max_val = -1.0f;
         max_val = fmax(max_val, surface_val);
-        max_val = fmax(max_val, mountain_val);
+        // max_val = fmax(max_val, mountain_val);
 
         final_val = max_val;
+    }
+
+    // sky
+    else {
+        final_val = -1.0f;
     }
 
     // final value (with safety crop)

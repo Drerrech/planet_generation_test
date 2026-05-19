@@ -5,7 +5,7 @@
 [sub_resource type="BoxShape3D" id="BoxShape3D_f00ho"]
 size = Vector3(16, 16, 16)
 
-[node name="default_chunk" type="StaticBody3D" unique_id=1492706686]
+[node name="default_chunk" type="StaticBody3D" unique_id=1492706686 groups=["chunk"]]
 script = ExtResource("1_f00ho")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=168588245]

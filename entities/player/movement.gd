@@ -22,6 +22,10 @@ func _ready():
 		camera.current = false
 		return
 	camera.make_current()
+	
+	camera.cull_mask &= ~2          # camera ignores layer 2
+	$torso/MeshInstance3D.layers = 2  # mesh is on layer 2
+	
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
 func _input(event):
