@@ -1,6 +1,6 @@
 extends Node3D
 
-const SHOOT_RATE = 24.0  # max calls per second
+const SHOOT_RATE = 12.0  # max calls per second
 
 @onready var soil_gun = $soil_gun
 
@@ -9,7 +9,7 @@ var _time_to_next_shot: float = 0.0
 func _ready() -> void:
 	soil_gun.mode = 2
 	soil_gun.r = 2
-	soil_gun.soil_delta = 2
+	soil_gun.soil_delta = 4
 
 func _process(delta: float) -> void:
 	if not is_multiplayer_authority():
