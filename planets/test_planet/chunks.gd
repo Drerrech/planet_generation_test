@@ -34,25 +34,6 @@ func _exit_tree() -> void:
 		c_server.free()
 		c_server = null
 
-func build_mesh(verts: PackedVector3Array) -> ArrayMesh:
-	var mesh := ArrayMesh.new()
-	if verts.size() == 0:
-		return mesh
-	var normals := PackedVector3Array()
-	normals.resize(verts.size())
-	for i in range(0, verts.size(), 3):
-		var n = (verts[i+2] - verts[i]).cross(verts[i+1] - verts[i]).normalized()
-		normals[i] = n
-		normals[i+1] = n
-		normals[i+2] = n
-	var arrays: Array = []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = verts
-	arrays[Mesh.ARRAY_NORMAL] = normals
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	return mesh
-
-
 func add_all_chunks() -> void:
 	if print_debug:
 		print("[chunks] adding ", NUM_CHUNKS, " chunks...")
@@ -85,18 +66,6 @@ func load_chunk(chunk_id: int) -> void:
 	_generate_and_apply_mesh(chunk_id)
 
 
-func _apply_mesh(chunk_id: int, raw_vertices: PackedVector3Array) -> void:
-	var chunk_instance = get_child(chunk_id)
-	var mesh = build_mesh(raw_vertices)
-	chunk_instance.mesh_instance.mesh = mesh
-
-	chunk_instance.mesh_instance.material_override = _chunk_material
-
-	if mesh.get_surface_count() > 0:
-		#chunk_instance.collision_shape.shape = mesh.create_trimesh_shape()
-		pass
-
-
 func _generate_and_apply_mesh(chunk_id: int) -> void:
 	var chunk_instance = get_child(chunk_id)
 	var result = c_server.generate_chunk(
@@ -106,23 +75,24 @@ func _generate_and_apply_mesh(chunk_id: int) -> void:
 		chunk_instance.position.z
 	)
 	chunk_instance.point_values = result.point_values
-	_apply_mesh(chunk_id, result.vertices)
+	chunk_instance.mesh_instance.mesh = result.mesh
+	chunk_instance.mesh_instance.material_override = _chunk_material
+	chunk_instance.collision_shape.shape = result.mesh.create_trimesh_shape() if result.mesh.get_surface_count() > 0 else null
 
 
 func _update_chunk_mesh(chunk_id: int) -> void:
 	var chunk_instance = get_child(chunk_id)
 	var t0 = Time.get_ticks_usec()
-	var raw_vertices = c_server.update_chunk(
+	var mesh = c_server.update_chunk(
 		chunk_id,
 		chunk_instance.position.x,
 		chunk_instance.position.y,
 		chunk_instance.position.z,
 		chunk_instance.delta
 	)
-	var t1 = Time.get_ticks_usec()
-	_apply_mesh(chunk_id, raw_vertices)
-	var t2 = Time.get_ticks_usec()
-	print("update_chunk: %.2fms  apply_mesh: %.2fms" % [(t1-t0)/1000.0, (t2-t1)/1000.0])
+	chunk_instance.mesh_instance.mesh = mesh
+	chunk_instance.collision_shape.shape = mesh.create_trimesh_shape() if mesh.get_surface_count() > 0 else null
+	print("update_chunk: %.2fms" % [(Time.get_ticks_usec()-t0)/1000.0])
 
 
 # --- bin file helpers ---
@@ -212,12 +182,10 @@ func _server_apply_all_chunks(all_deltas: Dictionary, persist: bool) -> void:
 		for idx in all_deltas[chunk_id]:
 			if idx < chunk_instance.point_values.size():
 				chunk_instance.point_values[idx] = all_deltas[chunk_id][idx]
-	var t_rpc = Time.get_ticks_usec()
 	if persist:
 		_receive_chunk_changes_persist.rpc(all_deltas)
 	else:
 		_receive_chunk_changes.rpc(all_deltas)
-	print("rpc_send: %.2fms" % [(Time.get_ticks_usec()-t_rpc)/1000.0])
 
 @rpc("authority", "call_remote", "unreliable_ordered")
 func _receive_chunk_changes(all_deltas: Dictionary) -> void:

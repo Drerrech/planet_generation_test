@@ -50,14 +50,21 @@ static void _free_chunk(ChunkData *c) {
     free(c);
 }
 
-static PackedVector3Array _to_packed(const VertexArray &v_a) {
-    PackedVector3Array out;
-    out.resize(v_a.size);
-    Vector3 *w = out.ptrw();
+static Ref<ArrayMesh> _to_mesh(const VertexArray &v_a) {
+    Ref<ArrayMesh> mesh;
+    mesh.instantiate();
+    if (v_a.size == 0) return mesh;
+    PackedVector3Array verts;
+    verts.resize(v_a.size);
+    Vector3 *w = verts.ptrw();
     for (int i = 0; i < v_a.size; i++) {
         w[i] = Vector3(v_a.v_arr[i].x, v_a.v_arr[i].y, v_a.v_arr[i].z);
     }
-    return out;
+    Array arrays;
+    arrays.resize(Mesh::ARRAY_MAX);
+    arrays[Mesh::ARRAY_VERTEX] = verts;
+    mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);
+    return mesh;
 }
 
 ChunkServer::ChunkServer() {
@@ -99,12 +106,12 @@ Dictionary ChunkServer::generate_chunk(int chunk_id, float x, float y, float z) 
     memcpy(pv.ptrw(), c->arr, ARR_SIZE * sizeof(float));
 
     Dictionary result;
-    result["vertices"] = _to_packed(c->v_a);
+    result["mesh"] = _to_mesh(c->v_a);
     result["point_values"] = pv;
     return result;
 }
 
-PackedVector3Array ChunkServer::update_chunk(int chunk_id, float x, float y, float z, Dictionary delta) {
+Ref<ArrayMesh> ChunkServer::update_chunk(int chunk_id, float x, float y, float z, Dictionary delta) {
     ChunkData *c = (ChunkData *)chunks[chunk_id];
     if (!c) {
         c = _make_chunk(chunk_id, x, y, z, user_dir);
@@ -123,7 +130,7 @@ PackedVector3Array ChunkServer::update_chunk(int chunk_id, float x, float y, flo
 
     delete_vertex_array(&c->v_a);
     c->v_a = march_and_build_mesh(c->arr);
-    return _to_packed(c->v_a);
+    return _to_mesh(c->v_a);
 }
 
 void ChunkServer::free_chunk(int chunk_id) {
