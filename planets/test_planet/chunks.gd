@@ -132,6 +132,45 @@ func _write_chunk_bin(chunk_id: int) -> void:
 	f.close()
 
 
+# --- delta serialization ---
+
+func _encode_deltas(all_deltas: Dictionary) -> PackedByteArray:
+	var total = 4
+	for chunk_id in all_deltas:
+		total += 8 + all_deltas[chunk_id].size() * 8
+	var buf := PackedByteArray()
+	buf.resize(total)
+	var offset = 0
+	buf.encode_s32(offset, all_deltas.size())
+	offset += 4
+	for chunk_id in all_deltas:
+		var chunk_delta = all_deltas[chunk_id]
+		buf.encode_s32(offset, chunk_id)
+		buf.encode_s32(offset + 4, chunk_delta.size())
+		offset += 8
+		for idx in chunk_delta:
+			buf.encode_s32(offset, idx)
+			buf.encode_float(offset + 4, chunk_delta[idx])
+			offset += 8
+	return buf
+
+func _decode_deltas(buf: PackedByteArray) -> Dictionary:
+	var all_deltas := {}
+	var offset = 0
+	var num_chunks = buf.decode_s32(offset)
+	offset += 4
+	for _c in range(num_chunks):
+		var chunk_id = buf.decode_s32(offset)
+		var num_entries = buf.decode_s32(offset + 4)
+		offset += 8
+		var chunk_delta := {}
+		for _e in range(num_entries):
+			chunk_delta[buf.decode_s32(offset)] = buf.decode_float(offset + 4)
+			offset += 8
+		all_deltas[chunk_id] = chunk_delta
+	return all_deltas
+
+
 # --- chunk change RPCs ---
 
 func on_chunk_changed(chunk_id: int, incoming_delta: Dictionary) -> void:
@@ -155,7 +194,7 @@ func on_chunk_changed(chunk_id: int, incoming_delta: Dictionary) -> void:
 func send_dirty() -> void:
 	if multiplayer.is_server() or _dirty_chunks.is_empty():
 		return
-	_request_chunk_changes.rpc_id(1, _dirty_chunks)
+	_request_chunk_changes.rpc_id(1, _encode_deltas(_dirty_chunks))
 
 # Called by soil_gun when the dig button is released.
 func flush_pending() -> void:
@@ -165,14 +204,15 @@ func flush_pending() -> void:
 		_host_dirty_chunk_ids.clear()
 		return
 	if not _dirty_chunks.is_empty():
-		_flush_chunk_changes.rpc_id(1, _dirty_chunks)
+		_flush_chunk_changes.rpc_id(1, _encode_deltas(_dirty_chunks))
 	_dirty_chunks.clear()
 
 # Unreliable: one packet per shot with all affected chunks bundled together.
 # Newer packets supersede older ones so there is no queue buildup on the host.
 @rpc("any_peer", "call_remote", "unreliable_ordered")
-func _request_chunk_changes(all_deltas: Dictionary) -> void:
+func _request_chunk_changes(data: PackedByteArray) -> void:
 	var sender = multiplayer.get_remote_sender_id()
+	var all_deltas = _decode_deltas(data)
 	for chunk_id in all_deltas:
 		var chunk_instance = get_child(chunk_id)
 		for idx in all_deltas[chunk_id]:
@@ -181,8 +221,9 @@ func _request_chunk_changes(all_deltas: Dictionary) -> void:
 
 # Reliable: sent once on button release, guarantees final state is written to disk.
 @rpc("any_peer", "call_remote", "reliable")
-func _flush_chunk_changes(all_deltas: Dictionary) -> void:
+func _flush_chunk_changes(data: PackedByteArray) -> void:
 	var sender = multiplayer.get_remote_sender_id()
+	var all_deltas = _decode_deltas(data)
 	for chunk_id in all_deltas:
 		var chunk_instance = get_child(chunk_id)
 		for idx in all_deltas[chunk_id]:
@@ -198,16 +239,18 @@ func _server_apply_all_chunks(all_deltas: Dictionary, persist: bool, exclude_pee
 		for idx in all_deltas[chunk_id]:
 			if idx < chunk_instance.point_values.size():
 				chunk_instance.point_values[idx] = all_deltas[chunk_id][idx]
+	var encoded = _encode_deltas(all_deltas)
 	for peer_id in multiplayer.get_peers():
 		if peer_id == exclude_peer:
 			continue
 		if persist:
-			_receive_chunk_changes_persist.rpc_id(peer_id, all_deltas)
+			_receive_chunk_changes_persist.rpc_id(peer_id, encoded)
 		else:
-			_receive_chunk_changes.rpc_id(peer_id, all_deltas)
+			_receive_chunk_changes.rpc_id(peer_id, encoded)
 
 @rpc("authority", "call_remote", "unreliable_ordered")
-func _receive_chunk_changes(all_deltas: Dictionary) -> void:
+func _receive_chunk_changes(data: PackedByteArray) -> void:
+	var all_deltas = _decode_deltas(data)
 	for chunk_id in all_deltas:
 		var chunk_instance = get_child(chunk_id)
 		for idx in all_deltas[chunk_id]:
@@ -217,7 +260,8 @@ func _receive_chunk_changes(all_deltas: Dictionary) -> void:
 		_update_chunk_mesh(chunk_id)
 
 @rpc("authority", "call_remote", "reliable")
-func _receive_chunk_changes_persist(all_deltas: Dictionary) -> void:
+func _receive_chunk_changes_persist(data: PackedByteArray) -> void:
+	var all_deltas = _decode_deltas(data)
 	for chunk_id in all_deltas:
 		var chunk_instance = get_child(chunk_id)
 		for idx in all_deltas[chunk_id]:
