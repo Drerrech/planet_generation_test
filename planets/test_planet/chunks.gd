@@ -13,6 +13,9 @@ const CHUNK_SIZE = Vector3(32.0, 32.0, 32.0) # Vector3(16.0, 16.0, 16.0)
 
 const CHUNK_SIDE_SIZE = 33  # must match CHUNK_SIDE_SIZE in C
 
+const _chunk_shader := preload("res://planets/test_planet/shaders/test_shader.gdshader")
+var _chunk_material: ShaderMaterial
+
 var c_server: ChunkServer
 
 # Accumulated client-side changes per chunk, cleared after reliable flush
@@ -21,6 +24,8 @@ var _dirty_chunks: Dictionary = {}  # chunk_id -> {idx: val, ...}
 func init() -> void:
 	c_server = ChunkServer.new()
 	c_server.set_user_dir(ProjectSettings.globalize_path("user://"))
+	_chunk_material = ShaderMaterial.new()
+	_chunk_material.shader = _chunk_shader
 
 func _exit_tree() -> void:
 	if c_server:
@@ -28,19 +33,21 @@ func _exit_tree() -> void:
 		c_server = null
 
 func build_mesh(verts: PackedVector3Array) -> ArrayMesh:
-	if print_debug:
-		print("[chunks] building mesh with ", verts.size(), " vertices")
-	var st = SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for v in verts:
-		st.add_vertex(v)
-
-	st.generate_normals()
-	st.index()
-
-	var mesh = st.commit()
-	if print_debug:
-		print("[chunks] mesh built")
+	var mesh := ArrayMesh.new()
+	if verts.size() == 0:
+		return mesh
+	var normals := PackedVector3Array()
+	normals.resize(verts.size())
+	for i in range(0, verts.size(), 3):
+		var n = (verts[i+2] - verts[i]).cross(verts[i+1] - verts[i]).normalized()
+		normals[i] = n
+		normals[i+1] = n
+		normals[i+2] = n
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	return mesh
 
 
@@ -81,9 +88,7 @@ func _apply_mesh(chunk_id: int, raw_vertices: PackedVector3Array) -> void:
 	var mesh = build_mesh(raw_vertices)
 	chunk_instance.mesh_instance.mesh = mesh
 
-	var test_shader = ShaderMaterial.new()
-	test_shader.shader = preload("res://planets/test_planet/shaders/test_shader.gdshader")
-	chunk_instance.mesh_instance.material_override = test_shader
+	chunk_instance.mesh_instance.material_override = _chunk_material
 
 	if mesh.get_surface_count() > 0:
 		chunk_instance.collision_shape.shape = mesh.create_trimesh_shape()
