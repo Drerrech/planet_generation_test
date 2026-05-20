@@ -1,0 +1,7 @@
+[configuration]
+entry_symbol = "chunk_extension_init"
+compatibility_minimum = "4.1"
+
+[libraries]
+macos.debug = "res://chunk_extension/bin/libchunkserver.macos.template_debug.framework"
+windows.debug.x86_64 = "res://chunk_extension/bin/libchunkserver.windows.template_debug.x86_64.dll"
