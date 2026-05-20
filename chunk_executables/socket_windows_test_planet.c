@@ -4,9 +4,25 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <time.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #pragma comment(lib, "ws2_32.lib")
+
+static double ms_now(void) {
+    struct timespec ts;
+    timespec_get(&ts, TIME_UTC);
+    return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
+}
+
+static char log_path[512];
+
+static void log_ms(const char *label, int chunk_id, double ms) {
+    FILE *f = fopen(log_path, "a");
+    if (!f) return;
+    fprintf(f, "%s chunk %d: %.2f ms\n", label, chunk_id, ms);
+    fclose(f);
+}
 
 #define REQ_GENERATE 1
 #define REQ_DELETE   2
@@ -87,6 +103,8 @@ int main(int argc, char *argv[]) {
     else
         snprintf(user_dir, sizeof(user_dir), "./");
 
+    snprintf(log_path, sizeof(log_path), "%schunk_perf.log", user_dir);
+
     int port = 8999;
     if (argc > 2)
         port = atoi(argv[2]);
@@ -135,17 +153,13 @@ int main(int argc, char *argv[]) {
                 float chunk_pos[3];
                 recv(client, (char*)chunk_pos, sizeof(chunk_pos), MSG_WAITALL);
 
-                printf("[SERVER] generating chunk %d at %.1f %.1f %.1f\n", chunk_id, chunk_pos[0], chunk_pos[1], chunk_pos[2]);
-                fflush(stdout);
-
                 if (chunks[chunk_id] != NULL) {
                     delete_chunk(chunks[chunk_id]);
                 }
+                double t0 = ms_now();
                 Chunk *c_pointer = make_chunk(chunk_id, chunk_pos[0], chunk_pos[1], chunk_pos[2]);
                 chunks[chunk_id] = c_pointer;
-
-                printf("[SERVER] sending %d vertices\n", c_pointer->v_a.size);
-                fflush(stdout);
+                log_ms("generate", chunk_id, ms_now() - t0);
 
                 send_all(client, &c_pointer->v_a.size, sizeof(c_pointer->v_a.size));
                 send_all(client, c_pointer->v_a.v_arr, (size_t)c_pointer->v_a.size * sizeof(Vertex));
@@ -181,7 +195,9 @@ int main(int argc, char *argv[]) {
                     }
 
                     delete_vertex_array(&c->v_a);
+                    double t0 = ms_now();
                     c->v_a = march_and_build_mesh(c->arr);
+                    log_ms("update", chunk_id, ms_now() - t0);
                 }
 
                 send_all(client, &c->v_a.size, sizeof(c->v_a.size));

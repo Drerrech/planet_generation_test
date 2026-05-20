@@ -21,6 +21,9 @@ const CHUNK_ARRAY_SIZE = CHUNK_SIDE_SIZE * CHUNK_SIDE_SIZE * CHUNK_SIDE_SIZE
 var socket := StreamPeerTCP.new()
 var pid: int = -1
 
+# Accumulated client-side changes per chunk, cleared after reliable flush
+var _dirty_chunks: Dictionary = {}  # chunk_id -> {idx: val, ...}
+
 # NOTE: port is hardcoded per role — 8999 for host, 9080 for client.
 # This only supports one host + one client on the same machine.
 # Fix: use a GameState variable or dynamic port negotiation to support more instances.
@@ -162,6 +165,7 @@ func request_update(chunk_id: int, x: float, y: float, z: float) -> PackedVector
 	if print_debug:
 		print("[chunks] requesting update for chunk ", chunk_id)
 
+	var t0 = Time.get_ticks_msec()
 	socket.put_u8(REQ_UPDATE)
 	socket.put_32(chunk_id)
 	socket.put_float(x)
@@ -169,7 +173,9 @@ func request_update(chunk_id: int, x: float, y: float, z: float) -> PackedVector
 	socket.put_float(z)
 	socket.poll()
 
-	return _recv_vertices()
+	var verts = _recv_vertices()
+	print("[chunks] request_update chunk %d: %d ms total round-trip" % [chunk_id, Time.get_ticks_msec() - t0])
+	return verts
 
 func build_mesh(verts: PackedVector3Array) -> ArrayMesh:
 	if print_debug:
@@ -290,31 +296,73 @@ func _write_chunk_bin(chunk_id: int) -> void:
 
 func on_chunk_changed(chunk_id: int, incoming_delta: Dictionary) -> void:
 	if not multiplayer.is_server():
-		_request_chunk_change.rpc_id(1, chunk_id, incoming_delta)
+		# Accumulate — soil_gun calls send_dirty() once per shot to flush all at once
+		if chunk_id not in _dirty_chunks:
+			_dirty_chunks[chunk_id] = {}
+		for idx in incoming_delta:
+			_dirty_chunks[chunk_id][idx] = incoming_delta[idx]
 		return
-	_server_apply_chunk_change(chunk_id, incoming_delta)
+	# Host digging: wrap so the same handler works for both paths
+	_server_apply_all_chunks({chunk_id: incoming_delta})
 
+# Called by soil_gun after every shot.
+# Sends all dirty chunks in ONE unreliable packet — atomic UDP delivery means
+# boundary-adjacent chunks either both arrive or neither does, never one without the other.
+func send_dirty() -> void:
+	if multiplayer.is_server() or _dirty_chunks.is_empty():
+		return
+	_request_chunk_changes.rpc_id(1, _dirty_chunks)
+
+# Called by soil_gun when the dig button is released.
+func flush_pending() -> void:
+	if not _dirty_chunks.is_empty():
+		_flush_chunk_changes.rpc_id(1, _dirty_chunks)
+	_dirty_chunks.clear()
+
+# Unreliable: one packet per shot with all affected chunks bundled together.
+# Newer packets supersede older ones so there is no queue buildup on the host.
+@rpc("any_peer", "call_remote", "unreliable_ordered")
+func _request_chunk_changes(all_deltas: Dictionary) -> void:
+	for chunk_id in all_deltas:
+		var chunk_instance = get_child(chunk_id)
+		for idx in all_deltas[chunk_id]:
+			chunk_instance.delta[idx] = all_deltas[chunk_id][idx]
+	_server_apply_all_chunks(all_deltas)
+
+# Reliable: sent once on button release, guarantees final state is written to disk.
 @rpc("any_peer", "call_remote", "reliable")
-func _request_chunk_change(chunk_id: int, incoming_delta: Dictionary) -> void:
-	# TODO DIGGING: validate changes server-side (anti-cheat)
-	var chunk_instance = get_child(chunk_id)
-	for idx in incoming_delta:
-		chunk_instance.delta[idx] = incoming_delta[idx]
-	_server_apply_chunk_change(chunk_id, incoming_delta)
+func _flush_chunk_changes(all_deltas: Dictionary) -> void:
+	for chunk_id in all_deltas:
+		var chunk_instance = get_child(chunk_id)
+		for idx in all_deltas[chunk_id]:
+			chunk_instance.delta[idx] = all_deltas[chunk_id][idx]
+	_server_apply_all_chunks(all_deltas)
 
-func _server_apply_chunk_change(chunk_id: int, incoming_delta: Dictionary) -> void:
-	_write_chunk_bin(chunk_id)
-	_update_chunk_mesh(chunk_id)
-	_receive_chunk_change.rpc(chunk_id, incoming_delta)
+# Writes bins and rebuilds meshes for ALL chunks first, then broadcasts ONE combined
+# update. Clients always update boundary-adjacent chunks simultaneously, keeping
+# point_values in sync and preventing diverging deltas on subsequent shots.
+func _server_apply_all_chunks(all_deltas: Dictionary) -> void:
+	for chunk_id in all_deltas:
+		_write_chunk_bin(chunk_id)
+		_update_chunk_mesh(chunk_id)
+		# Keep server-side point_values in sync so host digging reads correct values
+		var chunk_instance = get_child(chunk_id)
+		for idx in all_deltas[chunk_id]:
+			if idx < chunk_instance.point_values.size():
+				chunk_instance.point_values[idx] = all_deltas[chunk_id][idx]
+	_receive_chunk_changes.rpc(all_deltas)
 
+# Clients receive all chunks from one shot/flush in one RPC and apply them together.
 @rpc("authority", "call_remote", "reliable")
-func _receive_chunk_change(chunk_id: int, incoming_delta: Dictionary) -> void:
-	var chunk_instance = get_child(chunk_id)
-	for idx in incoming_delta:
-		chunk_instance.delta[idx] = incoming_delta[idx]
-		chunk_instance.point_values[idx] = incoming_delta[idx]
-	_write_chunk_bin(chunk_id)
-	_update_chunk_mesh(chunk_id)
+func _receive_chunk_changes(all_deltas: Dictionary) -> void:
+	for chunk_id in all_deltas:
+		var chunk_instance = get_child(chunk_id)
+		for idx in all_deltas[chunk_id]:
+			chunk_instance.delta[idx] = all_deltas[chunk_id][idx]
+			if idx < chunk_instance.point_values.size():
+				chunk_instance.point_values[idx] = all_deltas[chunk_id][idx]
+		_write_chunk_bin(chunk_id)
+		_update_chunk_mesh(chunk_id)
 
 
 # --- bin data RPCs (used on chunk load) ---

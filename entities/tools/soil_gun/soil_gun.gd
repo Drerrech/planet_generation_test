@@ -9,6 +9,8 @@ var mode = 2
 var r = 2
 var soil_delta = 1.0
 
+var _last_chunks_ref = null
+
 var _indicator_mesh: SphereMesh
 var _indicator_mat: StandardMaterial3D
 
@@ -72,8 +74,9 @@ func shoot(time_delta: float) -> void:
 		return
 	if not raycast.get_collider().is_in_group("chunk"):
 		return
-	
+
 	var chunks_ref = raycast.get_collider().get_parent()
+	_last_chunks_ref = chunks_ref
 	var collision_point = raycast.get_collision_point()
 
 	match mode:
@@ -81,4 +84,11 @@ func shoot(time_delta: float) -> void:
 			ChunkModification.spherical_uniform_add_delta(chunks_ref, collision_point, r, soil_delta * time_delta)
 		2:  # smooth sphere
 			ChunkModification.spherical_smooth_add_delta(chunks_ref, collision_point, r, soil_delta * time_delta)
+
+	chunks_ref.send_dirty()
+
+func flush() -> void:
+	if _last_chunks_ref != null:
+		_last_chunks_ref.flush_pending()
+		_last_chunks_ref = null
 		
