@@ -207,18 +207,30 @@ func _server_apply_all_chunks(all_deltas: Dictionary, persist: bool) -> void:
 		for idx in all_deltas[chunk_id]:
 			if idx < chunk_instance.point_values.size():
 				chunk_instance.point_values[idx] = all_deltas[chunk_id][idx]
-	_receive_chunk_changes.rpc(all_deltas, persist)
+	if persist:
+		_receive_chunk_changes_persist.rpc(all_deltas)
+	else:
+		_receive_chunk_changes.rpc(all_deltas)
 
-@rpc("authority", "call_remote", "reliable")
-func _receive_chunk_changes(all_deltas: Dictionary, persist: bool) -> void:
+@rpc("authority", "call_remote", "unreliable_ordered")
+func _receive_chunk_changes(all_deltas: Dictionary) -> void:
 	for chunk_id in all_deltas:
 		var chunk_instance = get_child(chunk_id)
 		for idx in all_deltas[chunk_id]:
 			chunk_instance.delta[idx] = all_deltas[chunk_id][idx]
 			if idx < chunk_instance.point_values.size():
 				chunk_instance.point_values[idx] = all_deltas[chunk_id][idx]
-		if persist:
-			_write_chunk_bin(chunk_id)
+		_update_chunk_mesh(chunk_id)
+
+@rpc("authority", "call_remote", "reliable")
+func _receive_chunk_changes_persist(all_deltas: Dictionary) -> void:
+	for chunk_id in all_deltas:
+		var chunk_instance = get_child(chunk_id)
+		for idx in all_deltas[chunk_id]:
+			chunk_instance.delta[idx] = all_deltas[chunk_id][idx]
+			if idx < chunk_instance.point_values.size():
+				chunk_instance.point_values[idx] = all_deltas[chunk_id][idx]
+		_write_chunk_bin(chunk_id)
 		_update_chunk_mesh(chunk_id)
 
 
