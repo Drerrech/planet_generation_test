@@ -5,6 +5,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <unistd.h>
 
 #define REQ_GENERATE 1
@@ -116,6 +117,8 @@ int main(int argc, char *argv[]) {
     fflush(stdout);
 
     int client = accept(server, NULL, NULL); // blocks until godot connects
+    int nodelay = 1;
+    setsockopt(client, IPPROTO_TCP, TCP_NODELAY, &nodelay, sizeof(nodelay));
     printf("[SERVER] client connected\n");
     fflush(stdout);
 

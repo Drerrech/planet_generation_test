@@ -58,6 +58,8 @@ func init() -> void:
 			return
 		await get_tree().process_frame
 
+	socket.set_no_delay(true)
+
 	if print_debug:
 		print("[chunks] connected to server")
 

@@ -137,6 +137,8 @@ int main(int argc, char *argv[]) {
     fflush(stdout);
 
     SOCKET client = accept(server, NULL, NULL); // blocks until godot connects
+    int nodelay = 1;
+    setsockopt(client, IPPROTO_TCP, TCP_NODELAY, (const char*)&nodelay, sizeof(nodelay));
     printf("[SERVER] client connected\n");
     fflush(stdout);
 
