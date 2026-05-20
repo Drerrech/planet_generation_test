@@ -77,7 +77,13 @@ func _generate_and_apply_mesh(chunk_id: int) -> void:
 	chunk_instance.point_values = result.point_values
 	chunk_instance.mesh_instance.mesh = result.mesh
 	chunk_instance.mesh_instance.material_override = _chunk_material
-	chunk_instance.collision_shape.shape = result.mesh.create_trimesh_shape() if result.mesh.get_surface_count() > 0 else null
+	if result.mesh.get_surface_count() > 0:
+		var mesh = result.mesh
+		WorkerThreadPool.add_task(func():
+			chunk_instance.collision_shape.set_deferred("shape", mesh.create_trimesh_shape())
+		)
+	else:
+		chunk_instance.collision_shape.shape = null
 
 
 func _update_chunk_mesh(chunk_id: int) -> void:
@@ -91,7 +97,12 @@ func _update_chunk_mesh(chunk_id: int) -> void:
 		chunk_instance.delta
 	)
 	chunk_instance.mesh_instance.mesh = mesh
-	chunk_instance.collision_shape.shape = mesh.create_trimesh_shape() if mesh.get_surface_count() > 0 else null
+	if mesh.get_surface_count() > 0:
+		WorkerThreadPool.add_task(func():
+			chunk_instance.collision_shape.set_deferred("shape", mesh.create_trimesh_shape())
+		)
+	else:
+		chunk_instance.collision_shape.shape = null
 	print("update_chunk: %.2fms" % [(Time.get_ticks_usec()-t0)/1000.0])
 
 
