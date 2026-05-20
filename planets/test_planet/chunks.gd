@@ -139,8 +139,11 @@ func on_chunk_changed(chunk_id: int, incoming_delta: Dictionary) -> void:
 		# Accumulate — soil_gun calls send_dirty() once per shot to flush all at once
 		if chunk_id not in _dirty_chunks:
 			_dirty_chunks[chunk_id] = {}
+		var chunk_instance = get_child(chunk_id)
 		for idx in incoming_delta:
 			_dirty_chunks[chunk_id][idx] = incoming_delta[idx]
+			chunk_instance.delta[idx] = incoming_delta[idx]
+		_update_chunk_mesh(chunk_id)
 		return
 	# Host digging: defer bin write to flush_pending
 	_host_dirty_chunk_ids[chunk_id] = true
@@ -169,22 +172,24 @@ func flush_pending() -> void:
 # Newer packets supersede older ones so there is no queue buildup on the host.
 @rpc("any_peer", "call_remote", "unreliable_ordered")
 func _request_chunk_changes(all_deltas: Dictionary) -> void:
+	var sender = multiplayer.get_remote_sender_id()
 	for chunk_id in all_deltas:
 		var chunk_instance = get_child(chunk_id)
 		for idx in all_deltas[chunk_id]:
 			chunk_instance.delta[idx] = all_deltas[chunk_id][idx]
-	_server_apply_all_chunks(all_deltas, false)
+	_server_apply_all_chunks(all_deltas, false, sender)
 
 # Reliable: sent once on button release, guarantees final state is written to disk.
 @rpc("any_peer", "call_remote", "reliable")
 func _flush_chunk_changes(all_deltas: Dictionary) -> void:
+	var sender = multiplayer.get_remote_sender_id()
 	for chunk_id in all_deltas:
 		var chunk_instance = get_child(chunk_id)
 		for idx in all_deltas[chunk_id]:
 			chunk_instance.delta[idx] = all_deltas[chunk_id][idx]
-	_server_apply_all_chunks(all_deltas, true)
+	_server_apply_all_chunks(all_deltas, true, sender)
 
-func _server_apply_all_chunks(all_deltas: Dictionary, persist: bool) -> void:
+func _server_apply_all_chunks(all_deltas: Dictionary, persist: bool, exclude_peer: int = 0) -> void:
 	for chunk_id in all_deltas:
 		if persist:
 			_write_chunk_bin(chunk_id)
@@ -193,10 +198,13 @@ func _server_apply_all_chunks(all_deltas: Dictionary, persist: bool) -> void:
 		for idx in all_deltas[chunk_id]:
 			if idx < chunk_instance.point_values.size():
 				chunk_instance.point_values[idx] = all_deltas[chunk_id][idx]
-	if persist:
-		_receive_chunk_changes_persist.rpc(all_deltas)
-	else:
-		_receive_chunk_changes.rpc(all_deltas)
+	for peer_id in multiplayer.get_peers():
+		if peer_id == exclude_peer:
+			continue
+		if persist:
+			_receive_chunk_changes_persist.rpc_id(peer_id, all_deltas)
+		else:
+			_receive_chunk_changes.rpc_id(peer_id, all_deltas)
 
 @rpc("authority", "call_remote", "unreliable_ordered")
 func _receive_chunk_changes(all_deltas: Dictionary) -> void:
