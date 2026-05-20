@@ -9,6 +9,8 @@ void vertex() {
 }
 
 void fragment() {
+	NORMAL = normalize(cross(dFdy(VERTEX), dFdx(VERTEX)));
+	
     ALBEDO = vec3(
 		0.1 * mod(pow(_simplex3dNoiseFunc(0.5 * (world_pos + vec3(1, 0, 0))) * 2., 1.), 1.),
 		mod(pow(_simplex3dNoiseFunc(1.0 * (world_pos + vec3(0, 1, 0))) * 2., 2.), 1.),
