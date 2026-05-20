@@ -86,6 +86,8 @@ offset_bottom = 23.0
 scale = Vector2(2, 2)
 
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="." unique_id=1575176974]
+replication_interval = 0.05
+delta_interval = 0.05
 replication_config = SubResource("SceneReplicationConfig_abrql")
 
 [connection signal="area_entered" from="chunk_loading_area3d" to="." method="_on_chunk_loading_area_3d_area_entered"]

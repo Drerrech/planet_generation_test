@@ -93,7 +93,8 @@ func _apply_mesh(chunk_id: int, raw_vertices: PackedVector3Array) -> void:
 	chunk_instance.mesh_instance.material_override = _chunk_material
 
 	if mesh.get_surface_count() > 0:
-		chunk_instance.collision_shape.shape = mesh.create_trimesh_shape()
+		#chunk_instance.collision_shape.shape = mesh.create_trimesh_shape()
+		pass
 
 
 func _generate_and_apply_mesh(chunk_id: int) -> void:
@@ -110,6 +111,7 @@ func _generate_and_apply_mesh(chunk_id: int) -> void:
 
 func _update_chunk_mesh(chunk_id: int) -> void:
 	var chunk_instance = get_child(chunk_id)
+	var t0 = Time.get_ticks_usec()
 	var raw_vertices = c_server.update_chunk(
 		chunk_id,
 		chunk_instance.position.x,
@@ -117,7 +119,10 @@ func _update_chunk_mesh(chunk_id: int) -> void:
 		chunk_instance.position.z,
 		chunk_instance.delta
 	)
+	var t1 = Time.get_ticks_usec()
 	_apply_mesh(chunk_id, raw_vertices)
+	var t2 = Time.get_ticks_usec()
+	print("update_chunk: %.2fms  apply_mesh: %.2fms" % [(t1-t0)/1000.0, (t2-t1)/1000.0])
 
 
 # --- bin file helpers ---
@@ -207,10 +212,12 @@ func _server_apply_all_chunks(all_deltas: Dictionary, persist: bool) -> void:
 		for idx in all_deltas[chunk_id]:
 			if idx < chunk_instance.point_values.size():
 				chunk_instance.point_values[idx] = all_deltas[chunk_id][idx]
+	var t_rpc = Time.get_ticks_usec()
 	if persist:
 		_receive_chunk_changes_persist.rpc(all_deltas)
 	else:
 		_receive_chunk_changes.rpc(all_deltas)
+	print("rpc_send: %.2fms" % [(Time.get_ticks_usec()-t_rpc)/1000.0])
 
 @rpc("authority", "call_remote", "unreliable_ordered")
 func _receive_chunk_changes(all_deltas: Dictionary) -> void:
