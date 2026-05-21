@@ -12,7 +12,7 @@ sky_material = SubResource("ProceduralSkyMaterial_vm76h")
 
 [sub_resource type="Environment" id="Environment_cpskl"]
 background_mode = 1
-background_color = Color(0.45613867, 0.5276381, 0.65843236, 1)
+background_color = Color(0.042760402, 0.049242757, 0.101107456, 1)
 sky = SubResource("Sky_7gi6k")
 tonemap_mode = 2
 glow_enabled = true

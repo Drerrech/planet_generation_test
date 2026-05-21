@@ -12,9 +12,20 @@ func _ready() -> void:
 	soil_gun.r = 2
 	soil_gun.soil_delta = 2
 
+func update_inputs():
+	if Input.is_action_pressed("1"):
+		soil_gun.r = 1
+	if Input.is_action_pressed("2"):
+		soil_gun.r = 2
+	if Input.is_action_pressed("3"):
+		soil_gun.r = 3
+	
+
 func _process(delta: float) -> void:
 	if not is_multiplayer_authority():
 		return
+	
+	update_inputs()
 
 	var digging = Input.is_action_pressed("m1") or Input.is_action_pressed("m2")
 

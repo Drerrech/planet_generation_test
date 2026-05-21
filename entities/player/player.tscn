@@ -68,6 +68,10 @@ script = ExtResource("2_bls4j")
 
 [node name="soil_gun" parent="torso/head/tools" unique_id=2142163457 instance=ExtResource("3_fkugw")]
 
+[node name="SpotLight3D" type="SpotLight3D" parent="torso/head/tools" unique_id=1804412315]
+spot_range = 40.0
+spot_angle = 60.0
+
 [node name="MeshInstance3D" type="MeshInstance3D" parent="torso" unique_id=1833300516]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)
 mesh = SubResource("BoxMesh_abrql")

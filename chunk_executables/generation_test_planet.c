@@ -61,23 +61,38 @@ float get_global_value(float x, float y, float z) {
     float final_val = 0.f;
 
     // TODO: inner layers
-    if (point_r < 0.95f * PLANET_LEVEL_R) {
-        final_val = 1.0f;
+    if (point_r < 0.75f * PLANET_LEVEL_R) {
+        final_val = 1.;
+    }
+    
+    else if (point_r < 0.95f * PLANET_LEVEL_R) {
+        float surface_val = (0.8f * PLANET_LEVEL_R - point_r) / CHUNK_CELL_SIDE_SIZE;
+        surface_val = fmin(fmax(surface_val, -1.0f), 1.0f);
+
+        float cave_val = fnlGetNoise3D(&simplex2_noise, 4.f * x, 4.f * y, 4.f * z);
+
+        // final value
+        float max_val = -1.0f;
+        max_val = fmax(max_val, surface_val);
+        max_val = fmax(max_val, cave_val);
+
+        final_val = max_val;
     }
     
     // surface and mountains
-    else if (point_r < 1.05f * PLANET_LEVEL_R) {
+    else if (point_r < 1.15f * PLANET_LEVEL_R) {
         // surface
         float surface_val = (PLANET_LEVEL_R - point_r) / CHUNK_CELL_SIDE_SIZE;
         surface_val = fmin(fmax(surface_val, -1.0f), 1.0f);
 
         // mountains
-        // float mountain_val = fnlGetNoise3D(&simplex2_noise, 4.f * x, 4.f * y, 4.f * z);
+        float mountain_val = (PLANET_LEVEL_R - point_r + SUFACE_LEVEL_MOUNTAIN_HEIGHT * fnlGetNoise3D(&simplex2_noise, 600.f * unit_dir_x, 600.f * unit_dir_y, 600.f * unit_dir_z)) / CHUNK_CELL_SIDE_SIZE;
+        mountain_val = fmin(fmax(mountain_val, -1.0f), 1.0f);
         
         // final value
         float max_val = -1.0f;
         max_val = fmax(max_val, surface_val);
-        // max_val = fmax(max_val, mountain_val);
+        max_val = fmax(max_val, mountain_val);
 
         final_val = max_val;
     }

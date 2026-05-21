@@ -88,7 +88,7 @@ func _generate_and_apply_mesh(chunk_id: int) -> void:
 
 func _update_chunk_mesh(chunk_id: int) -> void:
 	var chunk_instance = get_child(chunk_id)
-	var t0 = Time.get_ticks_usec()
+	var t0 = Time.get_ticks_usec() if print_debug else 0
 	var mesh = c_server.update_chunk(
 		chunk_id,
 		chunk_instance.position.x,
@@ -103,7 +103,8 @@ func _update_chunk_mesh(chunk_id: int) -> void:
 		)
 	else:
 		chunk_instance.collision_shape.shape = null
-	print("update_chunk: %.2fms" % [(Time.get_ticks_usec()-t0)/1000.0])
+	if print_debug:
+		print("update_chunk: %.2fms" % [(Time.get_ticks_usec()-t0)/1000.0])
 
 
 # --- bin file helpers ---
