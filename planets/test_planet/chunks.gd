@@ -50,12 +50,21 @@ func add_all_chunks() -> void:
 	if print_debug:
 		print("[chunks] all chunks added")
 
-func load_chunk(chunk_id: int) -> void:
+func load_chunk(chunk_id: int, load_collision: bool = false) -> void:
 	if print_debug:
 		print("Children count:", get_child_count())
 		print("[chunks] loading chunk ", chunk_id, "...")
 
 	var chunk_instance = get_child(chunk_id)
+
+	if load_collision:
+		var mesh = chunk_instance.mesh_instance.mesh
+		if mesh and mesh.get_surface_count() > 0:
+			WorkerThreadPool.add_task(func():
+				chunk_instance.collision_shape.set_deferred("shape", mesh.create_trimesh_shape())
+			)
+		return
+
 	chunk_instance.load_chunk()
 
 	if not multiplayer.is_server():
@@ -77,13 +86,6 @@ func _generate_and_apply_mesh(chunk_id: int) -> void:
 	chunk_instance.point_values = result.point_values
 	chunk_instance.mesh_instance.mesh = result.mesh
 	chunk_instance.mesh_instance.material_override = _chunk_material
-	if result.mesh.get_surface_count() > 0:
-		var mesh = result.mesh
-		WorkerThreadPool.add_task(func():
-			chunk_instance.collision_shape.set_deferred("shape", mesh.create_trimesh_shape())
-		)
-	else:
-		chunk_instance.collision_shape.shape = null
 
 
 func _update_chunk_mesh(chunk_id: int) -> void:

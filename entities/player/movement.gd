@@ -77,17 +77,43 @@ func _physics_process(delta):
 	move_and_slide()
 
 
-func _on_chunk_loading_area_3d_area_entered(area: Area3D) -> void:
+# SCRIPT BELOW IS OLD
+#func _on_chunk_loading_area_3d_area_entered(area: Area3D) -> void:
+	#if not is_multiplayer_authority(): return
+	#if area.is_in_group("chunk"):
+		#var chunk_instance = area.get_parent()
+		#var chunks = chunk_instance.get_parent()
+		#chunks.load_chunk(chunk_instance.chunk_id)
+#
+#
+#func _on_chunk_loading_area_3d_area_exited(area: Area3D) -> void:
+	#if not is_multiplayer_authority(): return
+	#if area.is_in_group("chunk"):
+		#var chunk_instance = area.get_parent()
+		#var chunks = chunk_instance.get_parent()
+		#chunks.unload_chunk(chunk_instance.chunk_id)
+# END OF OLD SCRIPT
+
+func _on_chunk_mesh_area_area_entered(area: Area3D) -> void:
 	if not is_multiplayer_authority(): return
 	if area.is_in_group("chunk"):
 		var chunk_instance = area.get_parent()
-		var chunks = chunk_instance.get_parent()
-		chunks.load_chunk(chunk_instance.chunk_id)
+		chunk_instance.get_parent().load_chunk(chunk_instance.chunk_id, false)
 
 
-func _on_chunk_loading_area_3d_area_exited(area: Area3D) -> void:
+func _on_chunk_mesh_area_area_exited(area: Area3D) -> void:
 	if not is_multiplayer_authority(): return
 	if area.is_in_group("chunk"):
 		var chunk_instance = area.get_parent()
-		var chunks = chunk_instance.get_parent()
-		chunks.unload_chunk(chunk_instance.chunk_id)
+		chunk_instance.get_parent().unload_chunk(chunk_instance.chunk_id)
+
+
+func _on_chunk_collision_area_area_entered(area: Area3D) -> void:
+	if not is_multiplayer_authority(): return
+	if area.is_in_group("chunk"):
+		var chunk_instance = area.get_parent()
+		chunk_instance.get_parent().load_chunk(chunk_instance.chunk_id, true)
+
+
+func _on_chunk_collision_area_area_exited(area: Area3D) -> void:
+	pass

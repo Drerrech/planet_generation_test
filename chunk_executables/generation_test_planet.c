@@ -59,21 +59,23 @@ float get_global_value(float x, float y, float z) {
     }
 
     float final_val = 0.f;
+    // stress tesing
+    // final_val = fnlGetNoise3D(&simplex2_noise, 4.f * x, 4.f * y, 4.f * z);
 
     // TODO: inner layers
-    if (point_r < 0.75f * PLANET_LEVEL_R) {
+    if (point_r < 0.1f * PLANET_LEVEL_R) {
         final_val = 1.;
     }
     
     else if (point_r < 0.95f * PLANET_LEVEL_R) {
-        float surface_val = (0.8f * PLANET_LEVEL_R - point_r) / CHUNK_CELL_SIDE_SIZE;
-        surface_val = fmin(fmax(surface_val, -1.0f), 1.0f);
+        // float surface_val = (0.8f * PLANET_LEVEL_R - point_r) / CHUNK_CELL_SIDE_SIZE;
+        // surface_val = fmin(fmax(surface_val, -1.0f), 1.0f);
 
         float cave_val = fnlGetNoise3D(&simplex2_noise, 4.f * x, 4.f * y, 4.f * z);
 
         // final value
         float max_val = -1.0f;
-        max_val = fmax(max_val, surface_val);
+        // max_val = fmax(max_val, surface_val);
         max_val = fmax(max_val, cave_val);
 
         final_val = max_val;

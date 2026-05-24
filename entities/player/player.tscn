@@ -25,9 +25,6 @@ albedo_color = Color(1, 0, 1, 1)
 material = SubResource("StandardMaterial3D_symyc")
 size = Vector3(0.6, 1.5, 0.6)
 
-[sub_resource type="SphereShape3D" id="SphereShape3D_symyc"]
-radius = 128.0
-
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_abrql"]
 properties/0/path = NodePath(".:position")
 properties/0/spawn = true
@@ -41,6 +38,12 @@ properties/2/replication_mode = 1
 properties/3/path = NodePath("torso/head:rotation")
 properties/3/spawn = true
 properties/3/replication_mode = 1
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_symyc"]
+radius = 128.0
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_bls4j"]
+radius = 32.0
 
 [node name="player" type="CharacterBody3D" unique_id=1616774405]
 script = ExtResource("1_symyc")
@@ -76,11 +79,6 @@ spot_angle = 60.0
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)
 mesh = SubResource("BoxMesh_abrql")
 
-[node name="chunk_loading_area3d" type="Area3D" parent="." unique_id=1922640290 groups=["player"]]
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="chunk_loading_area3d" unique_id=1631846953]
-shape = SubResource("SphereShape3D_symyc")
-
 [node name="canvas" type="Node2D" parent="." unique_id=619496060]
 script = ExtResource("2_abrql")
 
@@ -94,5 +92,19 @@ replication_interval = 0.05
 delta_interval = 0.05
 replication_config = SubResource("SceneReplicationConfig_abrql")
 
-[connection signal="area_entered" from="chunk_loading_area3d" to="." method="_on_chunk_loading_area_3d_area_entered"]
-[connection signal="area_exited" from="chunk_loading_area3d" to="." method="_on_chunk_loading_area_3d_area_exited"]
+[node name="loading_areas" type="Node3D" parent="." unique_id=113012587]
+
+[node name="chunk_mesh_area" type="Area3D" parent="loading_areas" unique_id=1922640290 groups=["player"]]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="loading_areas/chunk_mesh_area" unique_id=1631846953]
+shape = SubResource("SphereShape3D_symyc")
+
+[node name="chunk_collision_area" type="Area3D" parent="loading_areas" unique_id=1504669024]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="loading_areas/chunk_collision_area" unique_id=2106758118]
+shape = SubResource("SphereShape3D_bls4j")
+
+[connection signal="area_entered" from="loading_areas/chunk_mesh_area" to="." method="_on_chunk_mesh_area_area_entered"]
+[connection signal="area_exited" from="loading_areas/chunk_mesh_area" to="." method="_on_chunk_mesh_area_area_exited"]
+[connection signal="area_entered" from="loading_areas/chunk_collision_area" to="." method="_on_chunk_collision_area_area_entered"]
+[connection signal="area_exited" from="loading_areas/chunk_collision_area" to="." method="_on_chunk_collision_area_area_exited"]
