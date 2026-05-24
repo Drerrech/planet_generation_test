@@ -7,11 +7,11 @@ const print_debug = false
 const chunk_scene := preload("res://chunks/default_chunk/default_chunk.tscn")
 
 # NOTE: MUST BE THE SAME AS EXECUTABLE
-const NUM_CHUNKS_SIDE = Vector3i(32, 32, 32) #Vector3i(16, 16, 16)
+const NUM_CHUNKS_SIDE = Vector3i(32, 32, 32)
 const NUM_CHUNKS = NUM_CHUNKS_SIDE.x * NUM_CHUNKS_SIDE.y * NUM_CHUNKS_SIDE.z
-const CHUNK_SIZE = Vector3(16.0, 16.0, 16.0) #Vector3(32.0, 32.0, 32.0)
+const CHUNK_SIZE = Vector3(16.0, 16.0, 16.0)
 
-const CHUNK_SIDE_SIZE = 17.0#33.0  # must match CHUNK_SIDE_SIZE in C
+const CHUNK_SIDE_SIZE = 17  # must match CHUNK_SIDE_SIZE in C
 
 const _chunk_shader := preload("res://planets/test_planet/shaders/test_shader.gdshader")
 var _chunk_material: ShaderMaterial
