@@ -182,6 +182,7 @@ VertexArray march_and_build_mesh(float *arr) {
                     // append vertex to mesh (duplicates will be removed by godot)
                     Vertex v;
                     v.x = p_inter_pos[0]; v.y = p_inter_pos[1]; v.z = p_inter_pos[2];
+                    v.r = 0.f; v.g = 0.f; v.b = 0.f; v.a = 0.f;
 
                     v_a.v_arr[v_a.size] = v;
                     v_a.size++;

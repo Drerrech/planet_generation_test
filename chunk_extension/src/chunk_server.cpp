@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/vector3.hpp>
+#include <godot_cpp/variant/packed_color_array.hpp>
+#include <godot_cpp/variant/color.hpp>
 
 extern "C" {
 #include "generation_test_planet.h"
@@ -56,13 +58,18 @@ static Ref<ArrayMesh> _to_mesh(const VertexArray &v_a) {
     if (v_a.size == 0) return mesh;
     PackedVector3Array verts;
     verts.resize(v_a.size);
+    PackedColorArray colors;
+    colors.resize(v_a.size);
     Vector3 *w = verts.ptrw();
+    Color *c = colors.ptrw();
     for (int i = 0; i < v_a.size; i++) {
         w[i] = Vector3(v_a.v_arr[i].x, v_a.v_arr[i].y, v_a.v_arr[i].z);
+        c[i] = Color(v_a.v_arr[i].r, v_a.v_arr[i].g, v_a.v_arr[i].b, v_a.v_arr[i].a);
     }
     Array arrays;
     arrays.resize(Mesh::ARRAY_MAX);
     arrays[Mesh::ARRAY_VERTEX] = verts;
+    arrays[Mesh::ARRAY_COLOR] = colors;
     mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);
     return mesh;
 }
