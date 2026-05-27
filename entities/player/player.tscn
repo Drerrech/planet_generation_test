@@ -4,6 +4,7 @@
 [ext_resource type="Script" uid="uid://c6uwkgon46pa" path="res://entities/player/canvas.gd" id="2_abrql"]
 [ext_resource type="Script" uid="uid://b47jlgt3iq40n" path="res://entities/player/tools.gd" id="2_bls4j"]
 [ext_resource type="PackedScene" uid="uid://bp4b1xfm3erq2" path="res://entities/tools/soil_gun/soil_gun.tscn" id="3_fkugw"]
+[ext_resource type="Script" uid="uid://ck8kllcqg5x6" path="res://entities/player/jetpack.gd" id="4_fkugw"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_sfv1e"]
 size = Vector3(0.6, 2, 0.6)
@@ -25,6 +26,24 @@ albedo_color = Color(1, 0, 1, 1)
 material = SubResource("StandardMaterial3D_symyc")
 size = Vector3(0.6, 1.5, 0.6)
 
+[sub_resource type="BoxMesh" id="BoxMesh_fkugw"]
+size = Vector3(0.4, 0.6, 0.2)
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_8fjmc"]
+direction = Vector3(0, -1, 0)
+spread = 15.0
+initial_velocity_min = 4.0
+initial_velocity_max = 6.0
+gravity = Vector3(0, 0, 0)
+scale_min = 0.049999997
+scale_max = 0.39999998
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bls4j"]
+albedo_color = Color(0.32941177, 0.77254903, 0.99607843, 1)
+
+[sub_resource type="QuadMesh" id="QuadMesh_qiwj3"]
+material = SubResource("StandardMaterial3D_bls4j")
+
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_abrql"]
 properties/0/path = NodePath(".:position")
 properties/0/spawn = true
@@ -38,6 +57,9 @@ properties/2/replication_mode = 1
 properties/3/path = NodePath("torso/head:rotation")
 properties/3/spawn = true
 properties/3/replication_mode = 1
+properties/4/path = NodePath("torso/jetpack/GPUParticles3D:emitting")
+properties/4/spawn = true
+properties/4/replication_mode = 1
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_symyc"]
 radius = 128.0
@@ -45,7 +67,11 @@ radius = 128.0
 [sub_resource type="SphereShape3D" id="SphereShape3D_bls4j"]
 radius = 32.0
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_bls4j"]
+size = Vector3(0.6, 0.1, 0.6)
+
 [node name="player" type="CharacterBody3D" unique_id=1616774405]
+floor_max_angle = 1.0471976
 script = ExtResource("1_symyc")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=728266607]
@@ -79,6 +105,21 @@ spot_angle = 60.0
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)
 mesh = SubResource("BoxMesh_abrql")
 
+[node name="jetpack" type="Node3D" parent="torso" unique_id=1399634993]
+script = ExtResource("4_fkugw")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="torso/jetpack" unique_id=1401553102]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0.4)
+mesh = SubResource("BoxMesh_fkugw")
+
+[node name="GPUParticles3D" type="GPUParticles3D" parent="torso/jetpack" unique_id=1084308295]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0.4)
+emitting = false
+amount = 32
+transform_align = 3
+process_material = SubResource("ParticleProcessMaterial_8fjmc")
+draw_pass_1 = SubResource("QuadMesh_qiwj3")
+
 [node name="canvas" type="Node2D" parent="." unique_id=619496060]
 script = ExtResource("2_abrql")
 
@@ -103,6 +144,10 @@ shape = SubResource("SphereShape3D_symyc")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="loading_areas/chunk_collision_area" unique_id=2106758118]
 shape = SubResource("SphereShape3D_bls4j")
+
+[node name="ShapeCast3D" type="ShapeCast3D" parent="." unique_id=713875912]
+shape = SubResource("BoxShape3D_bls4j")
+target_position = Vector3(0, -0.05, 0)
 
 [connection signal="area_entered" from="loading_areas/chunk_mesh_area" to="." method="_on_chunk_mesh_area_area_entered"]
 [connection signal="area_exited" from="loading_areas/chunk_mesh_area" to="." method="_on_chunk_mesh_area_area_exited"]

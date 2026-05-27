@@ -281,12 +281,22 @@ func _receive_chunk_changes_persist(data: PackedByteArray) -> void:
 func request_bin_data(chunk_id: int) -> void:
 	if print_debug:
 		print("[chunks] request_bin_data received for chunk ", chunk_id, " from peer ", multiplayer.get_remote_sender_id())
-	var path = "user://player_delta/test_planet/%d.bin" % chunk_id
+	var chunk_instance = get_child(chunk_id)
 	var data := PackedByteArray()
-	if FileAccess.file_exists(path):
-		var f = FileAccess.open(path, FileAccess.READ)
-		data = f.get_buffer(f.get_length())
-		f.close()
+	if chunk_instance.loaded:
+		var delta = chunk_instance.delta
+		data.resize(delta.size() * 8)
+		var offset = 0
+		for idx in delta:
+			data.encode_s32(offset, idx)
+			data.encode_float(offset + 4, delta[idx])
+			offset += 8
+	else:
+		var path = "user://player_delta/test_planet/%d.bin" % chunk_id
+		if FileAccess.file_exists(path):
+			var f = FileAccess.open(path, FileAccess.READ)
+			data = f.get_buffer(f.get_length())
+			f.close()
 	var sender_id = multiplayer.get_remote_sender_id()
 	receive_bin_data.rpc_id(sender_id, chunk_id, data)
 
