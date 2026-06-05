@@ -89,18 +89,25 @@ static func spherical_uniform_set_delta(chunks_instance, global_center_pos: Vect
 		var delta = {}
 		for local_idx in affected[chunk_id]:
 			delta[local_idx] = value
-		chunk_instance.apply_changes(delta)
+		chunk_instance.apply_changes(delta, {})
 
 
 static func spherical_uniform_add_delta(chunks_instance, global_center_pos: Vector3, r: float, delta: float) -> void:
 	var affected = _get_affected_voxels(chunks_instance, global_center_pos, r)
+	var is_digging = delta < 0.0
 	for chunk_id in affected:
 		var chunk_instance = chunks_instance.get_child(chunk_id)
 		var chunk_delta = {}
+		var chunk_delta_type = {}
 		for local_idx in affected[chunk_id]:
 			var current = chunk_instance.point_values[local_idx] if local_idx < chunk_instance.point_values.size() else 0.0
-			chunk_delta[local_idx] = clamp(current + delta, -1.0, 1.0)
-		chunk_instance.apply_changes(chunk_delta)
+			var new_val = clamp(current + delta, -1.0, 1.0)
+			chunk_delta[local_idx] = new_val
+			if not is_digging and current <= 0.0 and new_val > 0.0:
+				chunk_delta_type[local_idx] = 1   # transitioning from empty to filled: mark as built
+			elif is_digging and current > 0.0 and new_val <= 0.0:
+				chunk_delta_type[local_idx] = 0   # transitioning from filled to empty: clear type
+		chunk_instance.apply_changes(chunk_delta, chunk_delta_type)
 
 
 static func _voxel_weight(chunks_instance, chunk_instance, local_idx: int, global_center_pos: Vector3, r: float) -> float:
@@ -122,16 +129,23 @@ static func spherical_smooth_set_delta(chunks_instance, global_center_pos: Vecto
 		for local_idx in affected[chunk_id]:
 			var weight = _voxel_weight(chunks_instance, chunk_instance, local_idx, global_center_pos, r)
 			delta[local_idx] = value * weight
-		chunk_instance.apply_changes(delta)
+		chunk_instance.apply_changes(delta, {})
 
 
 static func spherical_smooth_add_delta(chunks_instance, global_center_pos: Vector3, r: float, delta: float) -> void:
 	var affected = _get_affected_voxels(chunks_instance, global_center_pos, r)
+	var is_digging = delta < 0.0
 	for chunk_id in affected:
 		var chunk_instance = chunks_instance.get_child(chunk_id)
 		var chunk_delta = {}
+		var chunk_delta_type = {}
 		for local_idx in affected[chunk_id]:
 			var current = chunk_instance.point_values[local_idx] if local_idx < chunk_instance.point_values.size() else 0.0
 			var weight = _voxel_weight(chunks_instance, chunk_instance, local_idx, global_center_pos, r)
-			chunk_delta[local_idx] = clamp(current + delta * weight, -1.0, 1.0)
-		chunk_instance.apply_changes(chunk_delta)
+			var new_val = clamp(current + delta * weight, -1.0, 1.0)
+			chunk_delta[local_idx] = new_val
+			if not is_digging and current <= 0.0 and new_val > 0.0:
+				chunk_delta_type[local_idx] = 1   # transitioning from empty to filled: mark as built
+			elif is_digging and current > 0.0 and new_val <= 0.0:
+				chunk_delta_type[local_idx] = 0   # transitioning from filled to empty: clear type
+		chunk_instance.apply_changes(chunk_delta, chunk_delta_type)

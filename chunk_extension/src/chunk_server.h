@@ -21,7 +21,7 @@ public:
 
     void set_user_dir(String path);
     Dictionary generate_chunk(int chunk_id, float x, float y, float z);
-    Ref<ArrayMesh> update_chunk(int chunk_id, float x, float y, float z, Dictionary delta);
+    Ref<ArrayMesh> update_chunk(int chunk_id, float x, float y, float z, Dictionary delta, Dictionary delta_type);
     void free_chunk(int chunk_id);
 
 protected:

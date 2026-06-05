@@ -7,7 +7,7 @@
 render_priority = 0
 shader = ExtResource("1_glsl1")
 
-[sub_resource type="ArrayMesh" id="ArrayMesh_tstu3"]
+[sub_resource type="ArrayMesh" id="ArrayMesh_do025"]
 _surfaces = [{
 "aabb": AABB(-0.99886733, -0.5, -0.99886733, 1.9977347, 1, 1.9977347),
 "format": 34359738369,
@@ -20,5 +20,5 @@ _surfaces = [{
 
 [node name="MeshInstance3D" type="MeshInstance3D" unique_id=506833775]
 transform = Transform3D(3.41, 0, 0, 0, 0.09, 0, 0, 0, 1, 0, 0, 0)
-mesh = SubResource("ArrayMesh_tstu3")
+mesh = SubResource("ArrayMesh_do025")
 script = ExtResource("1_tstu3")

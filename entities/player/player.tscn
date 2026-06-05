@@ -68,7 +68,7 @@ radius = 128.0
 radius = 32.0
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_bls4j"]
-size = Vector3(0.6, 0.1, 0.6)
+size = Vector3(0.6, 0.01, 0.6)
 
 [node name="player" type="CharacterBody3D" unique_id=1616774405]
 floor_max_angle = 1.0471976
@@ -146,6 +146,7 @@ shape = SubResource("SphereShape3D_symyc")
 shape = SubResource("SphereShape3D_bls4j")
 
 [node name="ShapeCast3D" type="ShapeCast3D" parent="." unique_id=713875912]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.045, 0)
 shape = SubResource("BoxShape3D_bls4j")
 target_position = Vector3(0, -0.05, 0)
 

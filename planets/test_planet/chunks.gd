@@ -19,7 +19,8 @@ var _chunk_material: ShaderMaterial
 var c_server: ChunkServer
 
 # Accumulated client-side changes per chunk, cleared after reliable flush
-var _dirty_chunks: Dictionary = {}  # chunk_id -> {idx: val, ...}
+var _dirty_chunks: Dictionary = {}       # chunk_id -> {idx: val}
+var _dirty_chunk_types: Dictionary = {}  # chunk_id -> {idx: type}
 # Server-side: chunks dug by host this session, flushed to disk on button release
 var _host_dirty_chunk_ids: Dictionary = {}  # chunk_id -> true
 
@@ -96,7 +97,8 @@ func _update_chunk_mesh(chunk_id: int) -> void:
 		chunk_instance.position.x,
 		chunk_instance.position.y,
 		chunk_instance.position.z,
-		chunk_instance.delta
+		chunk_instance.delta,
+		chunk_instance.delta_type
 	)
 	chunk_instance.mesh_instance.mesh = mesh
 	if mesh.get_surface_count() > 0:
@@ -110,18 +112,24 @@ func _update_chunk_mesh(chunk_id: int) -> void:
 
 
 # --- bin file helpers ---
+# Binary format per entry: [uint16 idx][float16 value][uint8 type] = 5 bytes
 
 func _load_chunk_delta(chunk_id: int) -> void:
 	var chunk_instance = get_child(chunk_id)
 	chunk_instance.delta = {}
+	chunk_instance.delta_type = {}
 	var path = "user://player_delta/test_planet/%d.bin" % chunk_id
 	if not FileAccess.file_exists(path):
 		return
 	var f = FileAccess.open(path, FileAccess.READ)
-	while f.get_position() < f.get_length():
-		var idx = f.get_32()
-		var val = f.get_float()
+	while f.get_position() + 5 <= f.get_length():
+		var idx = f.get_16()
+		var val_bytes = f.get_buffer(2)
+		var val = val_bytes.decode_half(0)
+		var type = f.get_8()
 		chunk_instance.delta[idx] = val
+		if type != 0:
+			chunk_instance.delta_type[idx] = type
 	f.close()
 
 func _write_chunk_bin(chunk_id: int) -> void:
@@ -129,18 +137,24 @@ func _write_chunk_bin(chunk_id: int) -> void:
 	var dir = "user://player_delta/test_planet"
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir))
 	var f = FileAccess.open("%s/%d.bin" % [dir, chunk_id], FileAccess.WRITE)
+	var val_buf := PackedByteArray()
+	val_buf.resize(2)
 	for idx in chunk_instance.delta:
-		f.store_32(idx)
-		f.store_float(chunk_instance.delta[idx])
+		f.store_16(idx)
+		val_buf.encode_half(0, chunk_instance.delta[idx])
+		f.store_buffer(val_buf)
+		f.store_8(chunk_instance.delta_type.get(idx, 0))
 	f.close()
 
 
 # --- delta serialization ---
+# RPC format: [int32 num_chunks] then per chunk: [int32 chunk_id][int32 count][entries...]
+# Each entry: [uint16 idx][float16 value][uint8 type] = 5 bytes
 
-func _encode_deltas(all_deltas: Dictionary) -> PackedByteArray:
+func _encode_deltas(all_deltas: Dictionary, all_types: Dictionary) -> PackedByteArray:
 	var total = 4
 	for chunk_id in all_deltas:
-		total += 8 + all_deltas[chunk_id].size() * 8
+		total += 8 + all_deltas[chunk_id].size() * 5
 	var buf := PackedByteArray()
 	buf.resize(total)
 	var offset = 0
@@ -148,17 +162,20 @@ func _encode_deltas(all_deltas: Dictionary) -> PackedByteArray:
 	offset += 4
 	for chunk_id in all_deltas:
 		var chunk_delta = all_deltas[chunk_id]
+		var chunk_types = all_types.get(chunk_id, {})
 		buf.encode_s32(offset, chunk_id)
 		buf.encode_s32(offset + 4, chunk_delta.size())
 		offset += 8
 		for idx in chunk_delta:
-			buf.encode_s32(offset, idx)
-			buf.encode_float(offset + 4, chunk_delta[idx])
-			offset += 8
+			buf.encode_u16(offset, idx)
+			buf.encode_half(offset + 2, chunk_delta[idx])
+			buf[offset + 4] = chunk_types.get(idx, 0)
+			offset += 5
 	return buf
 
-func _decode_deltas(buf: PackedByteArray) -> Dictionary:
+func _decode_deltas(buf: PackedByteArray) -> Array:
 	var all_deltas := {}
+	var all_types := {}
 	var offset = 0
 	var num_chunks = buf.decode_s32(offset)
 	offset += 4
@@ -167,37 +184,48 @@ func _decode_deltas(buf: PackedByteArray) -> Dictionary:
 		var num_entries = buf.decode_s32(offset + 4)
 		offset += 8
 		var chunk_delta := {}
+		var chunk_types := {}
 		for _e in range(num_entries):
-			chunk_delta[buf.decode_s32(offset)] = buf.decode_float(offset + 4)
-			offset += 8
+			var idx = buf.decode_u16(offset)
+			var val = buf.decode_half(offset + 2)
+			var type = buf[offset + 4]
+			chunk_delta[idx] = val
+			if type != 0:
+				chunk_types[idx] = type
+			offset += 5
 		all_deltas[chunk_id] = chunk_delta
-	return all_deltas
+		all_types[chunk_id] = chunk_types
+	return [all_deltas, all_types]
 
 
 # --- chunk change RPCs ---
 
-func on_chunk_changed(chunk_id: int, incoming_delta: Dictionary) -> void:
+func on_chunk_changed(chunk_id: int, incoming_delta: Dictionary, incoming_delta_type: Dictionary) -> void:
 	if not multiplayer.is_server():
 		# Accumulate — soil_gun calls send_dirty() once per shot to flush all at once
 		if chunk_id not in _dirty_chunks:
 			_dirty_chunks[chunk_id] = {}
+		if chunk_id not in _dirty_chunk_types:
+			_dirty_chunk_types[chunk_id] = {}
 		var chunk_instance = get_child(chunk_id)
 		for idx in incoming_delta:
 			_dirty_chunks[chunk_id][idx] = incoming_delta[idx]
 			chunk_instance.delta[idx] = incoming_delta[idx]
+		for idx in incoming_delta_type:
+			_dirty_chunk_types[chunk_id][idx] = incoming_delta_type[idx]
+			chunk_instance.delta_type[idx] = incoming_delta_type[idx]
 		_update_chunk_mesh(chunk_id)
 		return
 	# Host digging: defer bin write to flush_pending
 	_host_dirty_chunk_ids[chunk_id] = true
-	_server_apply_all_chunks({chunk_id: incoming_delta}, false)
+	_server_apply_all_chunks({chunk_id: incoming_delta}, {chunk_id: incoming_delta_type}, false)
 
 # Called by soil_gun after every shot.
-# Sends all dirty chunks in ONE unreliable packet — atomic UDP delivery means
-# boundary-adjacent chunks either both arrive or neither does, never one without the other.
+# Sends all dirty chunks in ONE unreliable packet.
 func send_dirty() -> void:
 	if multiplayer.is_server() or _dirty_chunks.is_empty():
 		return
-	_request_chunk_changes.rpc_id(1, _encode_deltas(_dirty_chunks))
+	_request_chunk_changes.rpc_id(1, _encode_deltas(_dirty_chunks, _dirty_chunk_types))
 
 # Called by soil_gun when the dig button is released.
 func flush_pending() -> void:
@@ -207,33 +235,41 @@ func flush_pending() -> void:
 		_host_dirty_chunk_ids.clear()
 		return
 	if not _dirty_chunks.is_empty():
-		_flush_chunk_changes.rpc_id(1, _encode_deltas(_dirty_chunks))
+		_flush_chunk_changes.rpc_id(1, _encode_deltas(_dirty_chunks, _dirty_chunk_types))
 	_dirty_chunks.clear()
+	_dirty_chunk_types.clear()
 
 # Unreliable: one packet per shot with all affected chunks bundled together.
-# Newer packets supersede older ones so there is no queue buildup on the host.
 @rpc("any_peer", "call_remote", "unreliable_ordered")
 func _request_chunk_changes(data: PackedByteArray) -> void:
 	var sender = multiplayer.get_remote_sender_id()
-	var all_deltas = _decode_deltas(data)
+	var decoded = _decode_deltas(data)
+	var all_deltas = decoded[0]
+	var all_types = decoded[1]
 	for chunk_id in all_deltas:
 		var chunk_instance = get_child(chunk_id)
 		for idx in all_deltas[chunk_id]:
 			chunk_instance.delta[idx] = all_deltas[chunk_id][idx]
-	_server_apply_all_chunks(all_deltas, false, sender)
+		for idx in all_types.get(chunk_id, {}):
+			chunk_instance.delta_type[idx] = all_types[chunk_id][idx]
+	_server_apply_all_chunks(all_deltas, all_types, false, sender)
 
 # Reliable: sent once on button release, guarantees final state is written to disk.
 @rpc("any_peer", "call_remote", "reliable")
 func _flush_chunk_changes(data: PackedByteArray) -> void:
 	var sender = multiplayer.get_remote_sender_id()
-	var all_deltas = _decode_deltas(data)
+	var decoded = _decode_deltas(data)
+	var all_deltas = decoded[0]
+	var all_types = decoded[1]
 	for chunk_id in all_deltas:
 		var chunk_instance = get_child(chunk_id)
 		for idx in all_deltas[chunk_id]:
 			chunk_instance.delta[idx] = all_deltas[chunk_id][idx]
-	_server_apply_all_chunks(all_deltas, true, sender)
+		for idx in all_types.get(chunk_id, {}):
+			chunk_instance.delta_type[idx] = all_types[chunk_id][idx]
+	_server_apply_all_chunks(all_deltas, all_types, true, sender)
 
-func _server_apply_all_chunks(all_deltas: Dictionary, persist: bool, exclude_peer: int = 0) -> void:
+func _server_apply_all_chunks(all_deltas: Dictionary, all_types: Dictionary, persist: bool, exclude_peer: int = 0) -> void:
 	for chunk_id in all_deltas:
 		if persist:
 			_write_chunk_bin(chunk_id)
@@ -242,7 +278,7 @@ func _server_apply_all_chunks(all_deltas: Dictionary, persist: bool, exclude_pee
 		for idx in all_deltas[chunk_id]:
 			if idx < chunk_instance.point_values.size():
 				chunk_instance.point_values[idx] = all_deltas[chunk_id][idx]
-	var encoded = _encode_deltas(all_deltas)
+	var encoded = _encode_deltas(all_deltas, all_types)
 	for peer_id in multiplayer.get_peers():
 		if peer_id == exclude_peer:
 			continue
@@ -253,24 +289,32 @@ func _server_apply_all_chunks(all_deltas: Dictionary, persist: bool, exclude_pee
 
 @rpc("authority", "call_remote", "unreliable_ordered")
 func _receive_chunk_changes(data: PackedByteArray) -> void:
-	var all_deltas = _decode_deltas(data)
+	var decoded = _decode_deltas(data)
+	var all_deltas = decoded[0]
+	var all_types = decoded[1]
 	for chunk_id in all_deltas:
 		var chunk_instance = get_child(chunk_id)
 		for idx in all_deltas[chunk_id]:
 			chunk_instance.delta[idx] = all_deltas[chunk_id][idx]
 			if idx < chunk_instance.point_values.size():
 				chunk_instance.point_values[idx] = all_deltas[chunk_id][idx]
+		for idx in all_types.get(chunk_id, {}):
+			chunk_instance.delta_type[idx] = all_types[chunk_id][idx]
 		_update_chunk_mesh(chunk_id)
 
 @rpc("authority", "call_remote", "reliable")
 func _receive_chunk_changes_persist(data: PackedByteArray) -> void:
-	var all_deltas = _decode_deltas(data)
+	var decoded = _decode_deltas(data)
+	var all_deltas = decoded[0]
+	var all_types = decoded[1]
 	for chunk_id in all_deltas:
 		var chunk_instance = get_child(chunk_id)
 		for idx in all_deltas[chunk_id]:
 			chunk_instance.delta[idx] = all_deltas[chunk_id][idx]
 			if idx < chunk_instance.point_values.size():
 				chunk_instance.point_values[idx] = all_deltas[chunk_id][idx]
+		for idx in all_types.get(chunk_id, {}):
+			chunk_instance.delta_type[idx] = all_types[chunk_id][idx]
 		_write_chunk_bin(chunk_id)
 		_update_chunk_mesh(chunk_id)
 
@@ -285,12 +329,14 @@ func request_bin_data(chunk_id: int) -> void:
 	var data := PackedByteArray()
 	if chunk_instance.loaded:
 		var delta = chunk_instance.delta
-		data.resize(delta.size() * 8)
+		var delta_type = chunk_instance.delta_type
+		data.resize(delta.size() * 5)
 		var offset = 0
 		for idx in delta:
-			data.encode_s32(offset, idx)
-			data.encode_float(offset + 4, delta[idx])
-			offset += 8
+			data.encode_u16(offset, idx)
+			data.encode_half(offset + 2, delta[idx])
+			data[offset + 4] = delta_type.get(idx, 0)
+			offset += 5
 	else:
 		var path = "user://player_delta/test_planet/%d.bin" % chunk_id
 		if FileAccess.file_exists(path):
@@ -306,19 +352,22 @@ func receive_bin_data(chunk_id: int, data: PackedByteArray) -> void:
 		print("[chunks] receive_bin_data received for chunk ", chunk_id, " data size: ", data.size())
 	var chunk_instance = get_child(chunk_id)
 	chunk_instance.delta = {}
+	chunk_instance.delta_type = {}
 	if data.size() > 0:
 		var dir = "user://player_delta/test_planet"
 		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir))
 		var f = FileAccess.open("%s/%d.bin" % [dir, chunk_id], FileAccess.WRITE)
 		f.store_buffer(data)
 		f.close()
-		# populate in-memory delta from received bytes
 		var offset = 0
-		while offset + 8 <= data.size():
-			var idx = data.decode_s32(offset)
-			var val = data.decode_float(offset + 4)
+		while offset + 5 <= data.size():
+			var idx = data.decode_u16(offset)
+			var val = data.decode_half(offset + 2)
+			var type = data[offset + 4]
 			chunk_instance.delta[idx] = val
-			offset += 8
+			if type != 0:
+				chunk_instance.delta_type[idx] = type
+			offset += 5
 	_generate_and_apply_mesh(chunk_id)
 
 

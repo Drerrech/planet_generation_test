@@ -27,4 +27,4 @@ void delete_vertex_array(VertexArray *v_a);
 void init_noise();
 void fill_chunk_array(float *arr, float x_global, float y_global, float z_global);
 
-VertexArray march_and_build_mesh(float *arr);
+VertexArray march_and_build_mesh(float *arr, int *cell_type, float chunk_x, float chunk_y, float chunk_z);

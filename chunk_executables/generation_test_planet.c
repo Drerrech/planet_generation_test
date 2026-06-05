@@ -35,6 +35,9 @@ void init_noise() {
     cellular_eucl_sq_div_noise.cellular_return_type = FNL_CELLULAR_RETURN_TYPE_DISTANCE2DIV;
 }
 
+const int NUM_BIOMES = 2;
+const float BIOME_TRANSITION_MARGIN = 200.f; // must be above or including 1, smaller = smoother
+
 const float SUFACE_LEVEL_MOUNTAIN_HEIGHT = 20.f;
 
 float scale_to_0_1(float l, float h, float val) {
@@ -45,42 +48,45 @@ float scale_to_neg_1_1(float l, float h, float val) {
     return (fmin(fmax(val, l), h) - l) / (h - l) * 2.f - 1.f;
 }
 
-float get_global_value(float x, float y, float z) {
-    float point_r_sq = x*x + y*y + z*z;
-    float point_r = sqrtf(point_r_sq);
+float get_biome_idx_smooth(float x, float y, float z, float point_r_sq, float point_r, float unit_dir_x, float unit_dir_y, float unit_dir_z) {
+    return (NUM_BIOMES-1.f) * 0.5f * (fnlGetNoise3D(&simplex2_noise, 400.f * unit_dir_x, 400.f * unit_dir_y, 400.f * unit_dir_z) + 1.f);
+}
 
-    float unit_dir_x = 0.5773502692f;
-    float unit_dir_y = 0.5773502692f;
-    float unit_dir_z = 0.5773502692f;
-    if (fabs(x) >= 0.000001 || fabs(y) >= 0.000001 || fabs(z) >= 0.000001) {
-        unit_dir_x = x / point_r;
-        unit_dir_y = y / point_r;
-        unit_dir_z = z / point_r;
-    }
+float get_val_biome0(float x, float y, float z, float point_r_sq, float point_r, float unit_dir_x, float unit_dir_y, float unit_dir_z) {
+    // flats
+    float final_val = -1.f;
 
-    float final_val = 0.f;
-    // stress tesing
-    // final_val = fnlGetNoise3D(&simplex2_noise, 4.f * x, 4.f * y, 4.f * z);
-
-    // TODO: inner layers
-    if (point_r < 0.1f * PLANET_LEVEL_R) {
+    
+    if (point_r < 0.95f * PLANET_LEVEL_R) {
         final_val = 1.;
     }
-    
-    else if (point_r < 0.95f * PLANET_LEVEL_R) {
-        // float surface_val = (0.8f * PLANET_LEVEL_R - point_r) / CHUNK_CELL_SIDE_SIZE;
-        // surface_val = fmin(fmax(surface_val, -1.0f), 1.0f);
 
-        float cave_val = fnlGetNoise3D(&simplex2_noise, 4.f * x, 4.f * y, 4.f * z);
+    // surface
+    else if (point_r < 1.15f * PLANET_LEVEL_R) {
+        // surface
+        float surface_val = (PLANET_LEVEL_R - point_r) / CHUNK_CELL_SIDE_SIZE;
+        surface_val = fmin(fmax(surface_val, -1.0f), 1.0f);
 
-        // final value
-        float max_val = -1.0f;
-        // max_val = fmax(max_val, surface_val);
-        max_val = fmax(max_val, cave_val);
-
-        final_val = max_val;
+        final_val = surface_val;
     }
+
+    // sky
+    else {
+        final_val = -1.0f;
+    }
+
+    return final_val;
+}
+
+float get_val_biome1(float x, float y, float z, float point_r_sq, float point_r, float unit_dir_x, float unit_dir_y, float unit_dir_z) {
+    // mountains
+    float final_val = -1.f;
+
     
+    if (point_r < 0.95f * PLANET_LEVEL_R) {
+        final_val = 1.;
+    }
+
     // surface and mountains
     else if (point_r < 1.15f * PLANET_LEVEL_R) {
         // surface
@@ -104,8 +110,38 @@ float get_global_value(float x, float y, float z) {
         final_val = -1.0f;
     }
 
-    // final value (with safety crop)
     return fmin(fmax(final_val, -1.0f), 1.0f);
+}
+
+float get_global_value(float x, float y, float z) {
+    float point_r_sq = x*x + y*y + z*z;
+    float point_r = sqrtf(point_r_sq);
+
+    float unit_dir_x = 0.5773502692f;
+    float unit_dir_y = 0.5773502692f;
+    float unit_dir_z = 0.5773502692f;
+    if (fabs(x) >= 0.000001 || fabs(y) >= 0.000001 || fabs(z) >= 0.000001) {
+        unit_dir_x = x / point_r;
+        unit_dir_y = y / point_r;
+        unit_dir_z = z / point_r;
+    }
+
+    // blending biomes
+    float final_val = -1.f;
+
+    float biome = get_biome_idx_smooth(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z);
+    float f = floorf(biome);
+    biome = fminf(fmaxf(BIOME_TRANSITION_MARGIN * (biome - 0.5f) + 0.5f, f), f + 1.0f);
+
+    if (biome == 0.f) {
+        final_val = get_val_biome0(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z);
+    } else if (biome < 1.f) {
+        final_val = (1.f - biome) * get_val_biome0(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z) + (biome - 0.f) * get_val_biome1(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z);
+    } else if (biome == 1.f) {
+        final_val = get_val_biome1(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z);
+    }
+    
+    return final_val;
 }
 
 
@@ -151,7 +187,7 @@ void delete_vertex_array(VertexArray *v_a) {
     free(v_a->v_arr);
 }
 
-VertexArray march_and_build_mesh(float *arr) {
+VertexArray march_and_build_mesh(float *arr, int *cell_type, float chunk_x, float chunk_y, float chunk_z) {
     VertexArray v_a = make_vertex_array();
     
     for (int x_idx = 0; x_idx < CHUNK_SIDE_SIZE - 1; x_idx++) {
@@ -171,6 +207,9 @@ VertexArray march_and_build_mesh(float *arr) {
                     float p0_val = arr[get_idx(p0[0] + x_idx, p0[1] + y_idx, p0[2] + z_idx)];
                     float p1_val = arr[get_idx(p1[0] + x_idx, p1[1] + y_idx, p1[2] + z_idx)];
 
+                    int p0_type = cell_type[get_idx(p0[0] + x_idx, p0[1] + y_idx, p0[2] + z_idx)];
+                    int p1_type = cell_type[get_idx(p1[0] + x_idx, p1[1] + y_idx, p1[2] + z_idx)];
+
                     // interpolate and multiply vector by cell size (identical in logic, but less repetition)
                     float t = (ISO_LEVEL - p0_val) / (p1_val - p0_val);
                     float p_inter_pos[] = {
@@ -182,8 +221,41 @@ VertexArray march_and_build_mesh(float *arr) {
                     // append vertex to mesh (duplicates will be removed by godot)
                     Vertex v;
                     v.x = p_inter_pos[0]; v.y = p_inter_pos[1]; v.z = p_inter_pos[2];
-                    v.r = 0.f; v.g = 0.f; v.b = 0.f; v.a = 0.f;
+                    
+                    // r - biome
+                    // g - cell type (int)
+                    // b - 
+                    // a - 
 
+                    // TODO biomes
+                    float x = chunk_x + v.x;
+                    float y = chunk_y + v.y;
+                    float z = chunk_z + v.z;
+
+                    float point_r_sq = x*x + y*y + z*z;
+                    float point_r = sqrtf(point_r_sq);
+
+                    
+                    float unit_dir_x = 0.5773502692f;
+                    float unit_dir_y = 0.5773502692f;
+                    float unit_dir_z = 0.5773502692f;
+                    if (fabs(x) >= 0.000001 || fabs(y) >= 0.000001 || fabs(z) >= 0.000001) {
+                        unit_dir_x = x / point_r;
+                        unit_dir_y = y / point_r;
+                        unit_dir_z = z / point_r;
+                    }
+                    
+                    float biome = get_biome_idx_smooth(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z);
+                    float f = floorf(biome);
+                    v.r = fminf(fmaxf(BIOME_TRANSITION_MARGIN * (biome - 0.5f) + 0.5f, f), f + 1.0f);
+
+                    // cell type
+                    if (p0_type == 1 || p1_type == 1) {
+                        v.g = 1.f; // player delta is a special case, takes priority
+                    } else{
+                        v.g = (t <= 0.5f) ? p0_type : p1_type;
+                    }
+                    
                     v_a.v_arr[v_a.size] = v;
                     v_a.size++;
                 }
