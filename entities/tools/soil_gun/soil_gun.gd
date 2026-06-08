@@ -35,7 +35,9 @@ func _show_indicators(chunks_ref: Node, affected: Dictionary) -> void:
 	var cell_size: float = chunks_ref.CHUNK_SIZE.x / (CHUNK_SIDE_SIZE - 1)
 
 	for chunk_id in affected:
-		var chunk_instance = chunks_ref.get_child(chunk_id)
+		var chunk_instance = chunks_ref.get_chunk(chunk_id)
+		if not chunk_instance:
+			continue
 		var chunk_world_pos = chunk_instance.global_position
 
 		for local_idx in affected[chunk_id]:

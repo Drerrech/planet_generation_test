@@ -1,0 +1,13 @@
+[gd_scene format=3 uid="uid://dl1kwyk0pox7v"]
+
+[ext_resource type="Script" uid="uid://bt6l7igx6hq7t" path="res://entities/helpers/chunk_loader/chunk_loader.gd" id="1_b2lt1"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_b2lt1"]
+
+[node name="chunk_loader" type="Node3D" unique_id=72722487]
+script = ExtResource("1_b2lt1")
+
+[node name="detector" type="Area3D" parent="." unique_id=1135722526]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="detector" unique_id=1257144570]
+shape = SubResource("BoxShape3D_b2lt1")

@@ -35,8 +35,9 @@ void init_noise() {
     cellular_eucl_sq_div_noise.cellular_return_type = FNL_CELLULAR_RETURN_TYPE_DISTANCE2DIV;
 }
 
-const int NUM_BIOMES = 2;
-const float BIOME_TRANSITION_MARGIN = 200.f; // must be above or including 1, smaller = smoother
+const int NUM_BIOMES_AXIS_1 = 2;
+const int NUM_BIOMES_AXIS_2 = 2;
+const float BIOME_TRANSITION_MARGIN = 0.1f; // (0, 0.5]
 
 const float SUFACE_LEVEL_MOUNTAIN_HEIGHT = 20.f;
 
@@ -48,70 +49,145 @@ float scale_to_neg_1_1(float l, float h, float val) {
     return (fmin(fmax(val, l), h) - l) / (h - l) * 2.f - 1.f;
 }
 
-float get_biome_idx_smooth(float x, float y, float z, float point_r_sq, float point_r, float unit_dir_x, float unit_dir_y, float unit_dir_z) {
-    return (NUM_BIOMES-1.f) * 0.5f * (fnlGetNoise3D(&simplex2_noise, 400.f * unit_dir_x, 400.f * unit_dir_y, 400.f * unit_dir_z) + 1.f);
+// temperature
+float get_biome_axis_1_surface(float unit_dir_x, float unit_dir_y, float unit_dir_z) {
+    return (NUM_BIOMES_AXIS_1-1.f) * 0.5f * (fnlGetNoise3D(&simplex2_noise, 400.f * unit_dir_x, 400.f * unit_dir_y, 400.f * unit_dir_z) + 1.f);
+}
+// fertility
+float get_biome_axis_2_surface(float unit_dir_x, float unit_dir_y, float unit_dir_z) {
+    return (NUM_BIOMES_AXIS_2-1.f) * 0.5f * (fnlGetNoise3D(&simplex2_noise, 300.f * unit_dir_x + 100000.f, 300.f * unit_dir_y, 300.f * unit_dir_z) + 1.f);
 }
 
-float get_val_biome0(float x, float y, float z, float point_r_sq, float point_r, float unit_dir_x, float unit_dir_y, float unit_dir_z) {
-    // flats
-    float final_val = -1.f;
+// BIOME MATRIX
+// hill(2)   mushroom(3)
+// plains(0) creeks(1)
+// and addapter to connect
 
+float get_adapter_val(float x, float y, float z, float point_r_sq, float point_r, float unit_dir_x, float unit_dir_y, float unit_dir_z) {
+    float surface_val = (PLANET_LEVEL_R - point_r) / CHUNK_CELL_SIDE_SIZE;
+    surface_val = fmin(fmax(surface_val, -1.0f), 1.0f);
+
+    return surface_val;
+}
+
+float get_plains_val(float x, float y, float z, float point_r_sq, float point_r, float unit_dir_x, float unit_dir_y, float unit_dir_z) {
+    float surface_val = (PLANET_LEVEL_R - point_r) / CHUNK_CELL_SIDE_SIZE;
+    surface_val = fmin(fmax(surface_val, -1.0f), 1.0f);
+
+    return surface_val;
+}
+float get_creeks_val(float x, float y, float z, float point_r_sq, float point_r, float unit_dir_x, float unit_dir_y, float unit_dir_z, float creek_depth_multiplier) {
+    float CREEK_MAX_DEPTH = 4.f;
     
-    if (point_r < 0.95f * PLANET_LEVEL_R) {
-        final_val = 1.;
+    float creek_depth = creek_depth_multiplier * CREEK_MAX_DEPTH * scale_to_0_1(-0.5f, 0.2f, fnlGetNoise3D(&cellular_eucl_sq_div_noise, 2400.f * unit_dir_x, 2400.f * unit_dir_y, 2400.f * unit_dir_z));
+    
+    float surface_val = (PLANET_LEVEL_R - point_r - creek_depth) / CHUNK_CELL_SIDE_SIZE;
+    
+    surface_val = fmin(fmax(surface_val, -1.0f), 1.0f);
+
+    return surface_val;
+}
+float get_hills_val(float x, float y, float z, float point_r_sq, float point_r, float unit_dir_x, float unit_dir_y, float unit_dir_z, float hill_height_multiplier) {
+    float HLL_MAX_HEIGHT = 12.f;
+    
+    float hill_height = hill_height_multiplier * HLL_MAX_HEIGHT * scale_to_0_1(-1.0f, 1.0f, fnlGetNoise3D(&simplex2_noise, 1200.f * unit_dir_x, 1200.f * unit_dir_y, 1200.f * unit_dir_z));
+    
+    float surface_val = (PLANET_LEVEL_R - point_r + hill_height) / CHUNK_CELL_SIDE_SIZE;
+    
+    surface_val = fmin(fmax(surface_val, -1.0f), 1.0f);
+
+    return surface_val;
+}
+float get_mushrooms_val(float x, float y, float z, float point_r_sq, float point_r, float unit_dir_x, float unit_dir_y, float unit_dir_z, float mushroom_height_multiplier) {
+    float MUSHROOM_MAX_HEIGHT = 8.f;
+    
+    float mushroom_height = mushroom_height_multiplier * MUSHROOM_MAX_HEIGHT * (1.f - scale_to_0_1(-1.0f, -0.94f, fnlGetNoise3D(&cellular_eucl_sq_mul_noise, 2400.f * unit_dir_x, 2400.f * unit_dir_y, 2400.f * unit_dir_z)));
+    
+    float surface_val = (PLANET_LEVEL_R - point_r + mushroom_height) / CHUNK_CELL_SIDE_SIZE;
+    
+    surface_val = fmin(fmax(surface_val, -1.0f), 1.0f);
+
+    return surface_val;
+}
+
+float get_biome_val_surface(float x, float y, float z, float point_r_sq, float point_r, float unit_dir_x, float unit_dir_y, float unit_dir_z) {
+    float biome_x1 = get_biome_axis_1_surface(unit_dir_x, unit_dir_y, unit_dir_z);
+    float biome_x2 = get_biome_axis_2_surface(unit_dir_x, unit_dir_y, unit_dir_z);
+    
+    float final_val;
+
+    // pure plains
+    if (biome_x1 <= 0.5f - BIOME_TRANSITION_MARGIN && biome_x2 <= 0.5f - BIOME_TRANSITION_MARGIN) {
+        final_val = get_plains_val(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z);
+    } else
+
+    // pure creeks
+    if (0.5f + BIOME_TRANSITION_MARGIN <= biome_x1 && biome_x2 <= 0.5f - BIOME_TRANSITION_MARGIN) {
+        final_val = get_creeks_val(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z, 1.f);
+    } else
+
+    // pure mountains
+    if (biome_x1 <= 0.5f - BIOME_TRANSITION_MARGIN && 0.5f + BIOME_TRANSITION_MARGIN <= biome_x2) {
+        final_val = get_hills_val(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z, 1.f);
+    } else
+
+    // pure mushrooms
+    if (0.5f + BIOME_TRANSITION_MARGIN <= biome_x1 && 0.5f + BIOME_TRANSITION_MARGIN <= biome_x2) {
+        final_val = get_mushrooms_val(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z, 1.f);
+    } else
+
+    // transitions to adapter
+    // plains <-> adapter
+    if (biome_x1 < 0.5f && biome_x2 < 0.5){
+        float adapter_weight = 1.f + (1.f / BIOME_TRANSITION_MARGIN) * fmaxf(+(biome_x1 - 0.5f), +(biome_x2 - 0.5f));
+        
+        // plains has no attributes
+        float plains_val = get_plains_val(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z);
+        // for now adapter is also just flat
+        float adapter_val = get_adapter_val(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z);
+
+        final_val = fmaxf(plains_val, adapter_val);
+    } else
+
+    // creeks <-> adapter
+    if (0.5f < biome_x1 && biome_x2 < 0.5){
+        float adapter_weight = 1.f + (1.f / BIOME_TRANSITION_MARGIN) * fmaxf(-(biome_x1 - 0.5f), +(biome_x2 - 0.5f));
+        
+        float creeks_val = get_creeks_val(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z, 1.f - adapter_weight);
+        float adapter_val = get_adapter_val(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z);
+
+        final_val = fminf(creeks_val, adapter_val);
+    } else
+
+    // hills <-> adapter
+    if (biome_x1 < 0.5f && 0.5 < biome_x2){
+        float adapter_weight = 1.f + (1.f / BIOME_TRANSITION_MARGIN) * fmaxf(+(biome_x1 - 0.5f), -(biome_x2 - 0.5f));
+        
+        float hills_val = get_hills_val(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z, 1.f - adapter_weight);
+        float adapter_val = get_adapter_val(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z);
+
+        final_val = fmaxf(hills_val, adapter_val);
+    } else
+
+    // mushrooms <-> adapter
+    if (0.5f < biome_x1 && 0.5 < biome_x2){
+        float adapter_weight = 1.f + (1.f / BIOME_TRANSITION_MARGIN) * fmaxf(-(biome_x1 - 0.5f), -(biome_x2 - 0.5f));
+        
+        float mushrooms_val = get_mushrooms_val(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z, 1.f - adapter_weight);
+        float adapter_val = get_adapter_val(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z);
+
+        final_val = fmaxf(mushrooms_val, adapter_val);
     }
 
-    // surface
-    else if (point_r < 1.15f * PLANET_LEVEL_R) {
-        // surface
-        float surface_val = (PLANET_LEVEL_R - point_r) / CHUNK_CELL_SIDE_SIZE;
-        surface_val = fmin(fmax(surface_val, -1.0f), 1.0f);
-
-        final_val = surface_val;
-    }
-
-    // sky
+    // pure adapter
     else {
-        final_val = -1.0f;
+        final_val = get_adapter_val(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z);
     }
 
     return final_val;
 }
 
-float get_val_biome1(float x, float y, float z, float point_r_sq, float point_r, float unit_dir_x, float unit_dir_y, float unit_dir_z) {
-    // mountains
-    float final_val = -1.f;
 
-    
-    if (point_r < 0.95f * PLANET_LEVEL_R) {
-        final_val = 1.;
-    }
-
-    // surface and mountains
-    else if (point_r < 1.15f * PLANET_LEVEL_R) {
-        // surface
-        float surface_val = (PLANET_LEVEL_R - point_r) / CHUNK_CELL_SIDE_SIZE;
-        surface_val = fmin(fmax(surface_val, -1.0f), 1.0f);
-
-        // mountains
-        float mountain_val = (PLANET_LEVEL_R - point_r + SUFACE_LEVEL_MOUNTAIN_HEIGHT * fnlGetNoise3D(&simplex2_noise, 600.f * unit_dir_x, 600.f * unit_dir_y, 600.f * unit_dir_z)) / CHUNK_CELL_SIDE_SIZE;
-        mountain_val = fmin(fmax(mountain_val, -1.0f), 1.0f);
-        
-        // final value
-        float max_val = -1.0f;
-        max_val = fmax(max_val, surface_val);
-        max_val = fmax(max_val, mountain_val);
-
-        final_val = max_val;
-    }
-
-    // sky
-    else {
-        final_val = -1.0f;
-    }
-
-    return fmin(fmax(final_val, -1.0f), 1.0f);
-}
 
 float get_global_value(float x, float y, float z) {
     float point_r_sq = x*x + y*y + z*z;
@@ -126,21 +202,23 @@ float get_global_value(float x, float y, float z) {
         unit_dir_z = z / point_r;
     }
 
-    // blending biomes
-    float final_val = -1.f;
-
-    float biome = get_biome_idx_smooth(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z);
-    float f = floorf(biome);
-    biome = fminf(fmaxf(BIOME_TRANSITION_MARGIN * (biome - 0.5f) + 0.5f, f), f + 1.0f);
-
-    if (biome == 0.f) {
-        final_val = get_val_biome0(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z);
-    } else if (biome < 1.f) {
-        final_val = (1.f - biome) * get_val_biome0(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z) + (biome - 0.f) * get_val_biome1(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z);
-    } else if (biome == 1.f) {
-        final_val = get_val_biome1(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z);
-    }
+    // biome generation
+    float final_val;
     
+    if (point_r < 0.95f * PLANET_LEVEL_R) {
+        final_val = 1.;
+    }
+
+    // surface and mountains
+    else if (point_r < 1.15f * PLANET_LEVEL_R) {
+        final_val = get_biome_val_surface(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z);
+    }
+
+    // sky
+    else {
+        final_val = -1.0f;
+    }
+
     return final_val;
 }
 
@@ -245,9 +323,17 @@ VertexArray march_and_build_mesh(float *arr, int *cell_type, float chunk_x, floa
                         unit_dir_z = z / point_r;
                     }
                     
-                    float biome = get_biome_idx_smooth(x, y, z, point_r_sq, point_r, unit_dir_x, unit_dir_y, unit_dir_z);
-                    float f = floorf(biome);
-                    v.r = fminf(fmaxf(BIOME_TRANSITION_MARGIN * (biome - 0.5f) + 0.5f, f), f + 1.0f);
+                    // biome
+                    // v.r = 2.f * floorf(2.f * get_biome_axis_2_surface(unit_dir_x, unit_dir_y, unit_dir_z)) + floorf(2.f * get_biome_axis_1_surface(unit_dir_x, unit_dir_y, unit_dir_z));
+                    float a1 = get_biome_axis_1_surface(unit_dir_x, unit_dir_y, unit_dir_z);
+                    float a2 = get_biome_axis_2_surface(unit_dir_x, unit_dir_y, unit_dir_z);
+                    float g1 = fminf(fmaxf((a1 - 0.5f) / (2.f * BIOME_TRANSITION_MARGIN) + 0.5f, 0.f), 1.f);
+                    float g2 = fminf(fmaxf((a2 - 0.5f) / (2.f * BIOME_TRANSITION_MARGIN) + 0.5f, 0.f), 1.f);
+                    v.r = g1 + 2.f * g2;
+                    
+                    v.b = a1;
+                    v.a = a2;
+                    // v.r = 2.f * (get_biome_axis_2_surface(unit_dir_x, unit_dir_y, unit_dir_z)) + (get_biome_axis_1_surface(unit_dir_x, unit_dir_y, unit_dir_z));
 
                     // cell type
                     if (p0_type == 1 || p1_type == 1) {

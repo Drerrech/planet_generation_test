@@ -11,7 +11,7 @@ namespace godot {
 class ChunkServer : public Node {
     GDCLASS(ChunkServer, Node)
 
-    static const int MAX_CHUNKS = 262144; // big magic number
+    static const int MAX_CHUNKS = 2097152; // big magic number 128^3
     void *chunks[MAX_CHUNKS];
     char user_dir[512];
 

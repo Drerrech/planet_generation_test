@@ -13,19 +13,19 @@ void vertex() {
 
 // biome textures
 vec3 frag_biome0() {
-	return vec3(1.0, 0.0, 0.0);
-}
-
-vec3 frag_biome1() {
 	return vec3(0.0, 1.0, 0.0);
 }
 
+vec3 frag_biome1() {
+	return vec3(0.5, 0.5, 0.0);
+}
+
 vec3 frag_biome2() {
-	return vec3(0.0, 0.0, 1.0);
+	return vec3(0.0, 1.0, 1.0);
 }
 
 vec3 frag_biome3() {
-	return vec3(1.0, 1.0, 1.0);
+	return vec3(0.5, 0.0, 0.5);
 }
 
 vec3 frag_type0() { // biome
@@ -48,7 +48,7 @@ vec3 frag_type1() { // player built
 
 void fragment() {
 	NORMAL = normalize(cross(dFdy(VERTEX), dFdx(VERTEX)));
-	
+	//ALBEDO = vec3(vertex_info.b, 0., vertex_info.a);
 	if (vertex_info.g <= 1.0) {
 		ALBEDO = mix(frag_type0(), frag_type1(), vertex_info.g);
 	}

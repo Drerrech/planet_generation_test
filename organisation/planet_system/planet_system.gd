@@ -31,7 +31,7 @@ func start_client() -> void:
 func _spawn_function(id: int) -> Node:
 	var player = player_scene.instantiate()
 	player.name = str(id)
-	player.position = Vector3(0, 320, 0)
+	player.position = Vector3(0, 410, 0)
 	player.set_multiplayer_authority(id)
 	return player
 

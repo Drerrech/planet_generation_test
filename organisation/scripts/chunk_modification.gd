@@ -85,7 +85,9 @@ static func _get_affected_voxels(chunks_instance, global_center_pos: Vector3, r:
 static func spherical_uniform_set_delta(chunks_instance, global_center_pos: Vector3, r: float, value: float) -> void:
 	var affected = _get_affected_voxels(chunks_instance, global_center_pos, r)
 	for chunk_id in affected:
-		var chunk_instance = chunks_instance.get_child(chunk_id)
+		var chunk_instance = chunks_instance.get_chunk(chunk_id)
+		if not chunk_instance:
+			continue
 		var delta = {}
 		for local_idx in affected[chunk_id]:
 			delta[local_idx] = value
@@ -96,7 +98,9 @@ static func spherical_uniform_add_delta(chunks_instance, global_center_pos: Vect
 	var affected = _get_affected_voxels(chunks_instance, global_center_pos, r)
 	var is_digging = delta < 0.0
 	for chunk_id in affected:
-		var chunk_instance = chunks_instance.get_child(chunk_id)
+		var chunk_instance = chunks_instance.get_chunk(chunk_id)
+		if not chunk_instance:
+			continue
 		var chunk_delta = {}
 		var chunk_delta_type = {}
 		for local_idx in affected[chunk_id]:
@@ -124,7 +128,9 @@ static func _voxel_weight(chunks_instance, chunk_instance, local_idx: int, globa
 static func spherical_smooth_set_delta(chunks_instance, global_center_pos: Vector3, r: float, value: float) -> void:
 	var affected = _get_affected_voxels(chunks_instance, global_center_pos, r)
 	for chunk_id in affected:
-		var chunk_instance = chunks_instance.get_child(chunk_id)
+		var chunk_instance = chunks_instance.get_chunk(chunk_id)
+		if not chunk_instance:
+			continue
 		var delta = {}
 		for local_idx in affected[chunk_id]:
 			var weight = _voxel_weight(chunks_instance, chunk_instance, local_idx, global_center_pos, r)
@@ -136,7 +142,9 @@ static func spherical_smooth_add_delta(chunks_instance, global_center_pos: Vecto
 	var affected = _get_affected_voxels(chunks_instance, global_center_pos, r)
 	var is_digging = delta < 0.0
 	for chunk_id in affected:
-		var chunk_instance = chunks_instance.get_child(chunk_id)
+		var chunk_instance = chunks_instance.get_chunk(chunk_id)
+		if not chunk_instance:
+			continue
 		var chunk_delta = {}
 		var chunk_delta_type = {}
 		for local_idx in affected[chunk_id]:

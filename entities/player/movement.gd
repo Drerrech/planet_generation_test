@@ -30,9 +30,8 @@ func _ready():
 		return
 	camera.make_current()
 	
-	camera.cull_mask &= ~2          # camera ignores layer 2
-	$torso/MeshInstance3D.layers = 2  # mesh is on layer 2
-	$torso/jetpack/MeshInstance3D.layers = 2  # mesh is on layer 2
+	$torso/MeshInstance3D.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+	$torso/jetpack/MeshInstance3D.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
 	
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 
@@ -96,29 +95,4 @@ func _physics_process(delta):
 
 
 func _process(_delta):
-	pass
-
-
-func _on_chunk_mesh_area_area_entered(area: Area3D) -> void:
-	if not is_multiplayer_authority(): return
-	if area.is_in_group("chunk"):
-		var chunk_instance = area.get_parent()
-		chunk_instance.get_parent().load_chunk(chunk_instance.chunk_id, false)
-
-
-func _on_chunk_mesh_area_area_exited(area: Area3D) -> void:
-	if not is_multiplayer_authority(): return
-	if area.is_in_group("chunk"):
-		var chunk_instance = area.get_parent()
-		chunk_instance.get_parent().unload_chunk(chunk_instance.chunk_id)
-
-
-func _on_chunk_collision_area_area_entered(area: Area3D) -> void:
-	if not is_multiplayer_authority(): return
-	if area.is_in_group("chunk"):
-		var chunk_instance = area.get_parent()
-		chunk_instance.get_parent().load_chunk(chunk_instance.chunk_id, true)
-
-
-func _on_chunk_collision_area_area_exited(area: Area3D) -> void:
 	pass
